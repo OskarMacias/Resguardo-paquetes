@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control y Registro de Paquetes</title>
+  <title>Control de Paquetes, Resguardos y Anomalías</title>
   <style>
     :root {
       --primary: #2563eb;
@@ -14,6 +14,7 @@
       --border: #e2e8f0;
       --success: #16a34a;
       --warning: #d97706;
+      --danger: #dc2626;
     }
 
     * {
@@ -26,15 +27,16 @@
     body {
       background-color: var(--bg);
       color: var(--text);
-      padding: 20px;
-      max-width: 1200px;
+      padding: 15px;
+      max-width: 1300px;
       margin: 0 auto;
     }
 
     h1 {
       text-align: center;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       color: #0f172a;
+      font-size: 1.6rem;
     }
 
     .grid-container {
@@ -43,7 +45,7 @@
       gap: 20px;
     }
 
-    @media (max-width: 850px) {
+    @media (max-width: 900px) {
       .grid-container {
         grid-template-columns: 1fr;
       }
@@ -52,41 +54,41 @@
     .card {
       background: var(--card-bg);
       border-radius: 10px;
-      padding: 20px;
+      padding: 18px;
       box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
       border: 1px solid var(--border);
       margin-bottom: 20px;
     }
 
     .card h2 {
-      font-size: 1.25rem;
-      margin-bottom: 16px;
+      font-size: 1.15rem;
+      margin-bottom: 14px;
       color: #334155;
       border-bottom: 2px solid var(--bg);
       padding-bottom: 8px;
     }
 
     .form-group {
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
 
     label {
       display: block;
       font-weight: 600;
-      margin-bottom: 6px;
-      font-size: 0.9rem;
+      margin-bottom: 4px;
+      font-size: 0.85rem;
     }
 
-    input, select {
+    input, select, textarea {
       width: 100%;
-      padding: 10px;
+      padding: 9px;
       border: 1px solid var(--border);
       border-radius: 6px;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       outline: none;
     }
 
-    input:focus, select:focus {
+    input:focus, select:focus, textarea:focus {
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
     }
@@ -95,7 +97,7 @@
       background-color: var(--primary);
       color: white;
       border: none;
-      padding: 10px 16px;
+      padding: 10px 14px;
       border-radius: 6px;
       cursor: pointer;
       font-weight: 600;
@@ -108,8 +110,8 @@
     }
 
     .btn-action {
-      padding: 6px 12px;
-      font-size: 0.85rem;
+      padding: 5px 10px;
+      font-size: 0.8rem;
       width: auto;
       background-color: var(--success);
     }
@@ -119,31 +121,25 @@
     }
 
     .stats-container {
-      display: flex;
-      gap: 15px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
       margin-bottom: 15px;
     }
 
     .stat-box {
-      flex: 1;
-      padding: 12px;
+      padding: 10px;
       border-radius: 8px;
       text-align: center;
-      background: #f1f5f9;
+      font-size: 0.8rem;
     }
 
-    .stat-box.success {
-      background: #dcfce7;
-      color: #14532d;
-    }
-
-    .stat-box.warning {
-      background: #fef3c7;
-      color: #78350f;
-    }
+    .stat-box.success { background: #dcfce7; color: #14532d; }
+    .stat-box.warning { background: #fef3c7; color: #78350f; }
+    .stat-box.danger  { background: #fee2e2; color: #991b1b; }
 
     .stat-number {
-      font-size: 1.5rem;
+      font-size: 1.3rem;
       font-weight: bold;
     }
 
@@ -151,12 +147,12 @@
       width: 100%;
       border-collapse: collapse;
       margin-top: 10px;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
     }
 
     th, td {
       text-align: left;
-      padding: 10px;
+      padding: 8px;
       border-bottom: 1px solid var(--border);
     }
 
@@ -166,112 +162,184 @@
     }
 
     .badge {
-      padding: 4px 8px;
+      padding: 3px 7px;
       border-radius: 12px;
       font-size: 0.75rem;
       font-weight: bold;
       display: inline-block;
     }
 
-    .badge-resguardo {
-      background: #fef3c7;
-      color: #b45309;
-    }
-
-    .badge-entregado {
-      background: #dcfce7;
-      color: #15803d;
-    }
+    .badge-resguardo { background: #fef3c7; color: #b45309; }
+    .badge-entregado { background: #dcfce7; color: #15803d; }
+    .badge-anomalia  { background: #fee2e2; color: #991b1b; }
 
     .empty-message {
       text-align: center;
       color: #94a3b8;
-      padding: 20px;
+      padding: 15px;
+    }
+
+    .section-subtitle {
+      font-size: 0.95rem;
+      font-weight: bold;
+      margin-top: 15px;
+      margin-bottom: 6px;
+      color: #475569;
+      border-left: 3px solid var(--primary);
+      padding-left: 8px;
     }
   </style>
 </head>
 <body>
 
-  <h1>📦 Control de Paquetes Resguardados y Entregados</h1>
+  <h1>📦 Sistema de Paquetes, Resguardos y Anomalías</h1>
 
   <div class="grid-container">
     
-    <!-- COLUMNA IZQUIERDA: REGISTRO Y BÚSQUEDA POR PERSONA -->
+    <!-- COLUMNA IZQUIERDA: FORMULARIOS Y BUSCADOR -->
     <div>
-      <!-- Registrar Paquete -->
+      <!-- Formulario de Registro -->
       <div class="card">
-        <h2>Registrar Nuevo Paquete</h2>
+        <h2>Registrar Paquete / Anomalía</h2>
         <form id="packageForm">
+          <div class="form-group">
+            <label for="trackingNum">Número de Guía</label>
+            <input type="text" id="trackingNum" placeholder="Ej. JT123456789" required>
+          </div>
           <div class="form-group">
             <label for="personName">Nombre de la persona</label>
             <input type="text" id="personName" placeholder="Ej. Juan Pérez" required>
           </div>
           <div class="form-group">
-            <label for="description">Descripción del paquete</label>
-            <input type="text" id="description" placeholder="Ej. Caja Amazon, Sobre verde" required>
+            <label for="phone">Teléfono</label>
+            <input type="tel" id="phone" placeholder="Ej. 6671234567" required>
           </div>
           <div class="form-group">
-            <label for="status">Estado inicial</label>
-            <select id="status">
-              <option value="Resguardado">En resguardo</option>
+            <label for="description">Descripción / Contenido</label>
+            <input type="text" id="description" placeholder="Ej. Bolsa Temu, Caja Shein" required>
+          </div>
+          <div class="form-group">
+            <label for="status">Estado del Paquete</label>
+            <select id="status" onchange="toggleAnomalyNote()">
+              <option value="Resguardado">En Resguardo</option>
+              <option value="Anomalía">Anomalía (No entregado hoy)</option>
               <option value="Entregado">Entregado / Firmado</option>
             </select>
           </div>
+          <div class="form-group" id="anomalyGroup" style="display: none;">
+            <label for="anomalyNote">Motivo de Anomalía</label>
+            <input type="text" id="anomalyNote" placeholder="Ej. Dirección no encontrada, cliente no estaba">
+          </div>
           <div class="form-group">
-            <label for="entryDate">Fecha de ingreso / firma</label>
+            <label for="entryDate">Fecha de Registro</label>
             <input type="datetime-local" id="entryDate" required>
           </div>
           <button type="submit">Guardar Registro</button>
         </form>
       </div>
 
-      <!-- Buscar por Persona -->
+      <!-- Buscador Inteligente -->
       <div class="card">
-        <h2>Consultar por Persona</h2>
+        <h2>🔍 Buscador por Nombre, Teléfono o Guía</h2>
         <div class="form-group">
-          <label for="searchPerson">Nombre de la persona</label>
-          <input type="text" id="searchPerson" placeholder="Escribe un nombre..." oninput="searchPersonPackages()">
+          <input type="text" id="searchInput" placeholder="Escribe nombre, teléfono o # guía..." oninput="searchPackages()">
         </div>
 
         <div id="searchResults" style="display: none;">
           <div class="stats-container">
-            <div class="stat-box success">
-              <div>Firmados / Entregados</div>
-              <div class="stat-number" id="statSigned">0</div>
+            <div class="stat-box danger">
+              <div>Anomalías</div>
+              <div class="stat-number" id="statAnomalies">0</div>
             </div>
             <div class="stat-box warning">
-              <div>En Resguardo</div>
+              <div>Resguardos</div>
               <div class="stat-number" id="statPending">0</div>
+            </div>
+            <div class="stat-box success">
+              <div>Entregados</div>
+              <div class="stat-number" id="statSigned">0</div>
             </div>
           </div>
 
-          <h3>Historial del Destinatario:</h3>
+          <!-- Anomalías del usuario -->
+          <div class="section-subtitle">⚠️ Registro de Anomalías (No Entregados):</div>
           <div style="overflow-x: auto;">
             <table>
               <thead>
                 <tr>
-                  <th>Descripción</th>
-                  <th>Estado</th>
-                  <th>Fecha Firma</th>
+                  <th>Fecha Anomalía</th>
+                  <th>Guía</th>
+                  <th>Motivo / Comentario</th>
                 </tr>
               </thead>
-              <tbody id="searchTableBody"></tbody>
+              <tbody id="searchAnomaliesBody"></tbody>
             </table>
           </div>
+
+          <!-- Resguardos del usuario -->
+          <div class="section-subtitle">📦 Registro de Resguardos:</div>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha Ingreso</th>
+                  <th>Guía</th>
+                  <th>Descripción</th>
+                </tr>
+              </thead>
+              <tbody id="searchResguardosBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Entregados del usuario -->
+          <div class="section-subtitle">✅ Paquetes Firmados / Entregados:</div>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha Firma</th>
+                  <th>Guía</th>
+                  <th>Descripción</th>
+                </tr>
+              </thead>
+              <tbody id="searchEntregadosBody"></tbody>
+            </table>
+          </div>
+
         </div>
       </div>
     </div>
 
-    <!-- COLUMNA DERECHA: REGISTRO GENERAL -->
+    <!-- COLUMNA DERECHA: TABLAS GENERALES Y ANOMALÍAS -->
     <div>
+      <!-- Tabla de Anomalías Activas -->
       <div class="card">
-        <h2>Listado General de Paquetes</h2>
+        <h2>🚨 Control de Anomalías (Paquetes no entregados en el día)</h2>
         <div style="overflow-x: auto;">
           <table>
             <thead>
               <tr>
-                <th>Persona</th>
-                <th>Descripción</th>
+                <th>Fecha Anomalía</th>
+                <th>Cliente / Teléfono</th>
+                <th>Guía</th>
+                <th>Motivo</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="anomaliesTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tabla General -->
+      <div class="card">
+        <h2>📋 Todos los Paquetes Registrados</h2>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente / Tel.</th>
+                <th>Guía</th>
                 <th>Estado</th>
                 <th>Fecha Ingreso</th>
                 <th>Fecha Firma/Entrega</th>
@@ -287,31 +355,46 @@
   </div>
 
   <script>
-    // Base de datos local simulada
-    let packages = JSON.parse(localStorage.getItem('packages_data')) || [];
+    let packages = JSON.parse(localStorage.getItem('packages_v2_data')) || [];
 
-    // Establecer fecha y hora actual por defecto en el formulario
     document.addEventListener('DOMContentLoaded', () => {
-      const now = new Date();
-      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-      document.getElementById('entryDate').value = now.toISOString().slice(0, 16);
+      setCurrentDate();
       renderTables();
     });
 
-    // Guardar paquete
+    function setCurrentDate() {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      document.getElementById('entryDate').value = now.toISOString().slice(0, 16);
+    }
+
+    function toggleAnomalyNote() {
+      const status = document.getElementById('status').value;
+      const group = document.getElementById('anomalyGroup');
+      group.style.display = status === 'Anomalía' ? 'block' : 'none';
+    }
+
+    // Guardar nuevo registro
     document.getElementById('packageForm').addEventListener('submit', (e) => {
       e.preventDefault();
 
+      const tracking = document.getElementById('trackingNum').value.trim();
       const name = document.getElementById('personName').value.trim();
+      const phone = document.getElementById('phone').value.trim();
       const description = document.getElementById('description').value.trim();
       const status = document.getElementById('status').value;
+      const anomalyNote = document.getElementById('anomalyNote').value.trim();
       const entryDate = document.getElementById('entryDate').value;
 
       const newPackage = {
         id: Date.now(),
+        tracking: tracking,
         person: name,
+        phone: phone,
         description: description,
         status: status,
+        anomalyNote: status === 'Anomalía' ? anomalyNote : '',
+        anomalyDate: status === 'Anomalía' ? entryDate : null,
         entryDate: entryDate,
         signedDate: status === 'Entregado' ? entryDate : null
       };
@@ -320,13 +403,18 @@
       saveData();
       renderTables();
 
-      // Limpiar formulario excepto la fecha
+      // Limpiar formulario
+      document.getElementById('trackingNum').value = '';
       document.getElementById('personName').value = '';
+      document.getElementById('phone').value = '';
       document.getElementById('description').value = '';
+      document.getElementById('anomalyNote').value = '';
       document.getElementById('status').value = 'Resguardado';
+      toggleAnomalyNote();
+      setCurrentDate();
     });
 
-    // Cambiar estado a "Entregado/Firmado"
+    // Cambiar estado a "Entregado"
     function markAsDelivered(id) {
       const pkg = packages.find(p => p.id === id);
       if (pkg) {
@@ -336,16 +424,25 @@
         pkg.signedDate = now.toISOString().slice(0, 16);
         saveData();
         renderTables();
-        searchPersonPackages(); // Actualizar búsqueda activa
+        searchPackages();
       }
     }
 
-    // Guardar en localStorage
-    function saveData() {
-      localStorage.setItem('packages_data', JSON.stringify(packages));
+    // Cambiar estado de Anomalía a Resguardo
+    function markAsResguardo(id) {
+      const pkg = packages.find(p => p.id === id);
+      if (pkg) {
+        pkg.status = 'Resguardado';
+        saveData();
+        renderTables();
+        searchPackages();
+      }
     }
 
-    // Formatear fechas
+    function saveData() {
+      localStorage.setItem('packages_v2_data', JSON.stringify(packages));
+    }
+
     function formatDate(dateStr) {
       if (!dateStr) return '---';
       const date = new Date(dateStr);
@@ -355,31 +452,35 @@
       });
     }
 
-    // Renderizar tabla general
+    // Renderizado General
     function renderTables() {
+      renderGeneralTable();
+      renderAnomaliesTable();
+    }
+
+    function renderGeneralTable() {
       const tbody = document.getElementById('generalTableBody');
       tbody.innerHTML = '';
 
       if (packages.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-message">No hay paquetes registrados aún.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-message">No hay registros aún.</td></tr>`;
         return;
       }
 
-      // Ordenar por más recientes primero
       [...packages].reverse().forEach(pkg => {
         const tr = document.createElement('tr');
+        let badgeClass = 'badge-resguardo';
+        if (pkg.status === 'Entregado') badgeClass = 'badge-entregado';
+        if (pkg.status === 'Anomalía') badgeClass = 'badge-anomalia';
+
         tr.innerHTML = `
-          <td><strong>${pkg.person}</strong></td>
-          <td>${pkg.description}</td>
-          <td>
-            <span class="badge ${pkg.status === 'Entregado' ? 'badge-entregado' : 'badge-resguardo'}">
-              ${pkg.status}
-            </span>
-          </td>
+          <td><strong>${pkg.person}</strong><br><small style="color:#64748b">${pkg.phone}</small></td>
+          <td><small>${pkg.tracking}</small></td>
+          <td><span class="badge ${badgeClass}">${pkg.status}</span></td>
           <td>${formatDate(pkg.entryDate)}</td>
           <td>${formatDate(pkg.signedDate)}</td>
           <td>
-            ${pkg.status === 'Resguardado' 
+            ${pkg.status !== 'Entregado' 
               ? `<button class="btn-action" onclick="markAsDelivered(${pkg.id})">Firmar / Entregar</button>` 
               : '✅ Entregado'}
           </td>
@@ -388,49 +489,113 @@
       });
     }
 
-    // Buscar y calcular totales por persona
-    function searchPersonPackages() {
-      const query = document.getElementById('searchPerson').value.trim().toLowerCase();
+    function renderAnomaliesTable() {
+      const tbody = document.getElementById('anomaliesTableBody');
+      tbody.innerHTML = '';
+
+      const anomalies = packages.filter(p => p.status === 'Anomalía');
+
+      if (anomalies.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay anomalías registradas actualmente.</td></tr>`;
+        return;
+      }
+
+      [...anomalies].reverse().forEach(pkg => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${formatDate(pkg.anomalyDate || pkg.entryDate)}</td>
+          <td><strong>${pkg.person}</strong><br><small>${pkg.phone}</small></td>
+          <td><small>${pkg.tracking}</small></td>
+          <td><span style="color:#dc2626; font-weight:bold;">${pkg.anomalyNote || 'Sin motivo'}</span></td>
+          <td>
+            <button class="btn-action" style="background:#d97706; margin-bottom: 2px;" onclick="markAsResguardo(${pkg.id})">A Resguardo</button>
+            <button class="btn-action" onclick="markAsDelivered(${pkg.id})">Entregar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Buscador Inteligente por Teléfono, Nombre o Guía
+    function searchPackages() {
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
       const resultsContainer = document.getElementById('searchResults');
-      const tbody = document.getElementById('searchTableBody');
 
       if (!query) {
         resultsContainer.style.display = 'none';
         return;
       }
 
-      const filtered = packages.filter(p => p.person.toLowerCase().includes(query));
-
-      if (filtered.length === 0) {
-        resultsContainer.style.display = 'block';
-        document.getElementById('statSigned').textContent = '0';
-        document.getElementById('statPending').textContent = '0';
-        tbody.innerHTML = `<tr><td colspan="3" class="empty-message">No se encontraron registros para esta persona.</td></tr>`;
-        return;
-      }
-
-      const signedCount = filtered.filter(p => p.status === 'Entregado').length;
-      const pendingCount = filtered.filter(p => p.status === 'Resguardado').length;
-
-      document.getElementById('statSigned').textContent = signedCount;
-      document.getElementById('statPending').textContent = pendingCount;
-
-      tbody.innerHTML = '';
-      filtered.forEach(pkg => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${pkg.description}</td>
-          <td>
-            <span class="badge ${pkg.status === 'Entregado' ? 'badge-entregado' : 'badge-resguardo'}">
-              ${pkg.status}
-            </span>
-          </td>
-          <td>${formatDate(pkg.signedDate)}</td>
-        `;
-        tbody.appendChild(tr);
-      });
+      const filtered = packages.filter(p => 
+        p.person.toLowerCase().includes(query) ||
+        p.phone.toLowerCase().includes(query) ||
+        p.tracking.toLowerCase().includes(query)
+      );
 
       resultsContainer.style.display = 'block';
+
+      // Conteo de Stats
+      const anomalyCount = filtered.filter(p => p.status === 'Anomalía').length;
+      const pendingCount = filtered.filter(p => p.status === 'Resguardado').length;
+      const signedCount  = filtered.filter(p => p.status === 'Entregado').length;
+
+      document.getElementById('statAnomalies').textContent = anomalyCount;
+      document.getElementById('statPending').textContent = pendingCount;
+      document.getElementById('statSigned').textContent = signedCount;
+
+      // Renderizar Anomalías
+      const anomaliesBody = document.getElementById('searchAnomaliesBody');
+      anomaliesBody.innerHTML = '';
+      const listAnomalies = filtered.filter(p => p.anomalyDate || p.status === 'Anomalía');
+      if (listAnomalies.length === 0) {
+        anomaliesBody.innerHTML = `<tr><td colspan="3" class="empty-message">Sin fechas de anomalías.</td></tr>`;
+      } else {
+        listAnomalies.forEach(pkg => {
+          anomaliesBody.innerHTML += `
+            <tr>
+              <td>${formatDate(pkg.anomalyDate || pkg.entryDate)}</td>
+              <td><small>${pkg.tracking}</small></td>
+              <td>${pkg.anomalyNote || 'Anomalía del día'}</td>
+            </tr>
+          `;
+        });
+      }
+
+      // Renderizar Resguardos
+      const resguardosBody = document.getElementById('searchResguardosBody');
+      resguardosBody.innerHTML = '';
+      const listResguardos = filtered.filter(p => p.status === 'Resguardado');
+      if (listResguardos.length === 0) {
+        resguardosBody.innerHTML = `<tr><td colspan="3" class="empty-message">Sin paquetes en resguardo.</td></tr>`;
+      } else {
+        listResguardos.forEach(pkg => {
+          resguardosBody.innerHTML += `
+            <tr>
+              <td>${formatDate(pkg.entryDate)}</td>
+              <td><small>${pkg.tracking}</small></td>
+              <td>${pkg.description}</td>
+            </tr>
+          `;
+        });
+      }
+
+      // Renderizar Entregados
+      const entregadosBody = document.getElementById('searchEntregadosBody');
+      entregadosBody.innerHTML = '';
+      const listEntregados = filtered.filter(p => p.status === 'Entregado');
+      if (listEntregados.length === 0) {
+        entregadosBody.innerHTML = `<tr><td colspan="3" class="empty-message">Sin paquetes firmados.</td></tr>`;
+      } else {
+        listEntregados.forEach(pkg => {
+          entregadosBody.innerHTML += `
+            <tr>
+              <td>${formatDate(pkg.signedDate)}</td>
+              <td><small>${pkg.tracking}</small></td>
+              <td>${pkg.description}</td>
+            </tr>
+          `;
+        });
+      }
     }
   </script>
 </body>
