@@ -93,7 +93,7 @@
 
   <div class="grid-container">
     <div>
-      <!-- Buscador General Mejorado -->
+      <!-- Buscador General -->
       <div class="card">
         <h2>🔍 Buscador General</h2>
         <div class="form-group">
@@ -108,9 +108,9 @@
           </div>
 
           <div class="section-subtitle">📦 Registros Encontrados:</div>
-          <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+          <div style="overflow-x: auto; max-height: 450px; overflow-y: auto;">
             <table>
-              <thead><tr><th>Cliente / Guía</th><th>Estado</th><th>Acciones Directas</th></tr></thead>
+              <thead><tr><th>Cliente / Guía</th><th>Fechas</th><th>Estado / Acciones</th></tr></thead>
               <tbody id="searchResultsBody"></tbody>
             </table>
           </div>
@@ -426,7 +426,7 @@
       activePackages.forEach((pkg, index) => {
         const pkgNum = totalCount - index;
         const tr = document.createElement('tr');
-        tr.id = `pkg-row-${pkg.firebaseKey}`; // ID para desplazar el scroll
+        tr.id = `pkg-row-${pkg.firebaseKey}`;
         const isOverWeek = isOlderThanOneWeek(pkg.entryDate);
         if (isOverWeek) tr.classList.add('over-week');
 
@@ -480,7 +480,7 @@
       });
     }
 
-    // Buscador interactivo en tiempo real con acciones directas y auto-scroll
+    // Buscador interactivo que muestra Fecha de Ingreso y Fecha de Firma/Entrega
     function searchPackages() {
       const query = document.getElementById('searchInput').value.trim().toLowerCase();
       const resultsContainer = document.getElementById('searchResults');
@@ -514,11 +514,20 @@
             actionBtn = `<span style="color:#16a34a; font-weight:bold; font-size:0.75rem;">✅ Entregado</span>`;
           }
 
+          // Construir bloque con Fecha de Ingreso y Fecha de Firma/Entrega
+          let datesHtml = `<small style="color:#475569;"><strong>Ingreso:</strong> ${formatDate(pkg.entryDate)}</small>`;
+          if (pkg.status === 'Entregado') {
+            datesHtml += `<br><small style="color:#16a34a; font-weight:bold;"><strong>Entregado:</strong> ${formatDate(pkg.signedDate)}</small>`;
+          } else {
+            datesHtml += `<br><small style="color:#b45309;"><strong>Resguardo:</strong> ${calculateDaysInStorage(pkg.entryDate)}</small>`;
+          }
+
           body.innerHTML += `
             <tr class="search-row-clickable" onclick="scrollToPackage('${pkg.firebaseKey}')">
               <td><strong>${pkg.person}</strong><br><small style="color:#64748b">${pkg.tracking}</small></td>
-              <td><span class="badge ${badgeClass}">${pkg.status}</span></td>
+              <td>${datesHtml}</td>
               <td style="white-space: nowrap;">
+                <span class="badge ${badgeClass}" style="margin-bottom: 4px;">${pkg.status}</span><br>
                 <button class="btn-edit" onclick="event.stopPropagation(); openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
                 ${actionBtn}
               </td>
@@ -528,16 +537,15 @@
       }
     }
 
-    // Desplazar pantalla al paquete seleccionado y resaltarlo
     function scrollToPackage(key) {
       const targetRow = document.getElementById(`pkg-row-${key}`);
       if (targetRow) {
         targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
         targetRow.classList.remove('highlight-row');
-        void targetRow.offsetWidth; // Reiniciar animación
+        void targetRow.offsetWidth;
         targetRow.classList.add('highlight-row');
       } else {
-        alert('Este paquete ya no se encuentra activo en la lista de resguardos.');
+        alert('Este paquete fue entregado o se encuentra registrado en el historial de reportes.');
       }
     }
 
