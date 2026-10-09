@@ -79,7 +79,7 @@
       font-size: 0.85rem;
     }
 
-    input, select, textarea {
+    input, select {
       width: 100%;
       padding: 9px;
       border: 1px solid var(--border);
@@ -88,7 +88,7 @@
       outline: none;
     }
 
-    input:focus, select:focus, textarea:focus {
+    input:focus, select:focus {
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
     }
@@ -118,6 +118,20 @@
 
     .btn-action:hover {
       background-color: #15803d;
+    }
+
+    .btn-edit-phone {
+      background-color: #64748b;
+      padding: 2px 6px;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      width: auto;
+      margin-top: 3px;
+      display: inline-block;
+    }
+
+    .btn-edit-phone:hover {
+      background-color: #475569;
     }
 
     .stats-container {
@@ -159,6 +173,16 @@
     th {
       background-color: #f8fafc;
       color: #64748b;
+    }
+
+    /* Resaltado de filas de paquetes con más de 1 semana en resguardo */
+    tr.over-week {
+      background-color: #fef2f2 !important;
+    }
+
+    .text-over-week {
+      color: #dc2626;
+      font-weight: bold;
     }
 
     .badge {
@@ -211,12 +235,16 @@
             <input type="text" id="personName" placeholder="Ej. Juan Pérez" required>
           </div>
           <div class="form-group">
-            <label for="phone">Teléfono</label>
+            <label for="phone">Teléfono (Original / Guía)</label>
             <input type="tel" id="phone" placeholder="Ej. 6671234567" required>
           </div>
           <div class="form-group">
-            <label for="description">Descripción / Contenido</label>
-            <input type="text" id="description" placeholder="Ej. Bolsa Temu, Caja Shein" required>
+            <label for="altPhone">Teléfono Alternativo / Correcto <small style="color: #64748b; font-weight: normal;">(Opcional)</small></label>
+            <input type="tel" id="altPhone" placeholder="Ej. 6679998877 (En caso de estar mal el original)">
+          </div>
+          <div class="form-group">
+            <label for="description">Descripción / Contenido <small style="color: #64748b; font-weight: normal;">(Opcional)</small></label>
+            <input type="text" id="description" placeholder="Ej. Caja Shein, Bolsa Temu (Opcional)">
           </div>
           <div class="form-group">
             <label for="status">Estado del Paquete</label>
@@ -340,6 +368,7 @@
               <tr>
                 <th>Cliente / Tel.</th>
                 <th>Guía</th>
+                <th>Descripción</th>
                 <th>Estado</th>
                 <th>Fecha Ingreso</th>
                 <th>Fecha Firma/Entrega</th>
@@ -374,6 +403,20 @@
       group.style.display = status === 'Anomalía' ? 'block' : 'none';
     }
 
+    // Comprobar si han pasado más de 7 días (1 semana)
+    function isOlderThanOneWeek(entryDateStr) {
+      if (!entryDateStr) return false;
+      const entryDate = new Date(entryDateStr).getTime();
+      const now = new Date().getTime();
+      const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
+      return (now - entryDate) > sevenDaysInMs;
+    }
+
+    // Ordenar paquetes: fecha más actual arriba, más antigua abajo
+    function getSortedPackages(list) {
+      return [...list].sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
+    }
+
     // Guardar nuevo registro
     document.getElementById('packageForm').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -381,6 +424,7 @@
       const tracking = document.getElementById('trackingNum').value.trim();
       const name = document.getElementById('personName').value.trim();
       const phone = document.getElementById('phone').value.trim();
+      const altPhone = document.getElementById('altPhone').value.trim();
       const description = document.getElementById('description').value.trim();
       const status = document.getElementById('status').value;
       const anomalyNote = document.getElementById('anomalyNote').value.trim();
@@ -391,7 +435,8 @@
         tracking: tracking,
         person: name,
         phone: phone,
-        description: description,
+        altPhone: altPhone || '',
+        description: description || '---',
         status: status,
         anomalyNote: status === 'Anomalía' ? anomalyNote : '',
         anomalyDate: status === 'Anomalía' ? entryDate : null,
@@ -407,12 +452,28 @@
       document.getElementById('trackingNum').value = '';
       document.getElementById('personName').value = '';
       document.getElementById('phone').value = '';
+      document.getElementById('altPhone').value = '';
       document.getElementById('description').value = '';
       document.getElementById('anomalyNote').value = '';
       document.getElementById('status').value = 'Resguardado';
       toggleAnomalyNote();
       setCurrentDate();
     });
+
+    // Editar o agregar teléfono alternativo
+    function editAltPhone(id) {
+      const pkg = packages.find(p => p.id === id);
+      if (pkg) {
+        const currentPhone = pkg.altPhone || '';
+        const newPhone = prompt('Ingresa el teléfono alternativo / corregido para este registro:', currentPhone);
+        if (newPhone !== null) {
+          pkg.altPhone = newPhone.trim();
+          saveData();
+          renderTables();
+          searchPackages();
+        }
+      }
+    }
 
     // Cambiar estado a "Entregado"
     function markAsDelivered(id) {
@@ -452,6 +513,15 @@
       });
     }
 
+    function formatPhoneDisplay(pkg) {
+      let html = `<small style="color:#64748b">${pkg.phone}</small>`;
+      if (pkg.altPhone) {
+        html += `<br><small style="color:#2563eb; font-weight:bold;">Alt: ${pkg.altPhone}</small>`;
+      }
+      html += `<br><button class="btn-edit-phone" onclick="editAltPhone(${pkg.id})">✏️ Tel. Alt.</button>`;
+      return html;
+    }
+
     // Renderizado General
     function renderTables() {
       renderGeneralTable();
@@ -463,21 +533,36 @@
       tbody.innerHTML = '';
 
       if (packages.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-message">No hay registros aún.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-message">No hay registros aún.</td></tr>`;
         return;
       }
 
-      [...packages].reverse().forEach(pkg => {
+      const sortedList = getSortedPackages(packages);
+
+      sortedList.forEach(pkg => {
         const tr = document.createElement('tr');
+
+        // Evaluar si lleva más de una semana pendiente
+        const isOverWeek = pkg.status !== 'Entregado' && isOlderThanOneWeek(pkg.entryDate);
+        if (isOverWeek) {
+          tr.classList.add('over-week');
+        }
+
         let badgeClass = 'badge-resguardo';
         if (pkg.status === 'Entregado') badgeClass = 'badge-entregado';
         if (pkg.status === 'Anomalía') badgeClass = 'badge-anomalia';
 
+        const entryDateFormatted = formatDate(pkg.entryDate);
+        const entryDateDisplay = isOverWeek 
+          ? `<span class="text-over-week">${entryDateFormatted}<br><small style="font-size:0.75rem;">⚠️ +7 días</small></span>` 
+          : entryDateFormatted;
+
         tr.innerHTML = `
-          <td><strong>${pkg.person}</strong><br><small style="color:#64748b">${pkg.phone}</small></td>
+          <td><strong>${pkg.person}</strong><br>${formatPhoneDisplay(pkg)}</td>
           <td><small>${pkg.tracking}</small></td>
+          <td>${pkg.description || '---'}</td>
           <td><span class="badge ${badgeClass}">${pkg.status}</span></td>
-          <td>${formatDate(pkg.entryDate)}</td>
+          <td>${entryDateDisplay}</td>
           <td>${formatDate(pkg.signedDate)}</td>
           <td>
             ${pkg.status !== 'Entregado' 
@@ -500,11 +585,23 @@
         return;
       }
 
-      [...anomalies].reverse().forEach(pkg => {
+      const sortedAnomalies = getSortedPackages(anomalies);
+
+      sortedAnomalies.forEach(pkg => {
         const tr = document.createElement('tr');
+        const isOverWeek = isOlderThanOneWeek(pkg.entryDate);
+        if (isOverWeek) {
+          tr.classList.add('over-week');
+        }
+
+        const anomalyDateFormatted = formatDate(pkg.anomalyDate || pkg.entryDate);
+        const anomalyDateDisplay = isOverWeek 
+          ? `<span class="text-over-week">${anomalyDateFormatted}<br><small style="font-size:0.75rem;">⚠️ +7 días</small></span>` 
+          : anomalyDateFormatted;
+
         tr.innerHTML = `
-          <td>${formatDate(pkg.anomalyDate || pkg.entryDate)}</td>
-          <td><strong>${pkg.person}</strong><br><small>${pkg.phone}</small></td>
+          <td>${anomalyDateDisplay}</td>
+          <td><strong>${pkg.person}</strong><br>${formatPhoneDisplay(pkg)}</td>
           <td><small>${pkg.tracking}</small></td>
           <td><span style="color:#dc2626; font-weight:bold;">${pkg.anomalyNote || 'Sin motivo'}</span></td>
           <td>
@@ -529,15 +626,18 @@
       const filtered = packages.filter(p => 
         p.person.toLowerCase().includes(query) ||
         p.phone.toLowerCase().includes(query) ||
+        (p.altPhone && p.altPhone.toLowerCase().includes(query)) ||
         p.tracking.toLowerCase().includes(query)
       );
+
+      const sortedFiltered = getSortedPackages(filtered);
 
       resultsContainer.style.display = 'block';
 
       // Conteo de Stats
-      const anomalyCount = filtered.filter(p => p.status === 'Anomalía').length;
-      const pendingCount = filtered.filter(p => p.status === 'Resguardado').length;
-      const signedCount  = filtered.filter(p => p.status === 'Entregado').length;
+      const anomalyCount = sortedFiltered.filter(p => p.status === 'Anomalía').length;
+      const pendingCount = sortedFiltered.filter(p => p.status === 'Resguardado').length;
+      const signedCount  = sortedFiltered.filter(p => p.status === 'Entregado').length;
 
       document.getElementById('statAnomalies').textContent = anomalyCount;
       document.getElementById('statPending').textContent = pendingCount;
@@ -546,7 +646,7 @@
       // Renderizar Anomalías
       const anomaliesBody = document.getElementById('searchAnomaliesBody');
       anomaliesBody.innerHTML = '';
-      const listAnomalies = filtered.filter(p => p.anomalyDate || p.status === 'Anomalía');
+      const listAnomalies = sortedFiltered.filter(p => p.anomalyDate || p.status === 'Anomalía');
       if (listAnomalies.length === 0) {
         anomaliesBody.innerHTML = `<tr><td colspan="3" class="empty-message">Sin fechas de anomalías.</td></tr>`;
       } else {
@@ -564,16 +664,21 @@
       // Renderizar Resguardos
       const resguardosBody = document.getElementById('searchResguardosBody');
       resguardosBody.innerHTML = '';
-      const listResguardos = filtered.filter(p => p.status === 'Resguardado');
+      const listResguardos = sortedFiltered.filter(p => p.status === 'Resguardado');
       if (listResguardos.length === 0) {
         resguardosBody.innerHTML = `<tr><td colspan="3" class="empty-message">Sin paquetes en resguardo.</td></tr>`;
       } else {
         listResguardos.forEach(pkg => {
+          const isOverWeek = isOlderThanOneWeek(pkg.entryDate);
+          const entryDisplay = isOverWeek 
+            ? `<span class="text-over-week">${formatDate(pkg.entryDate)} (⚠️ +7 días)</span>` 
+            : formatDate(pkg.entryDate);
+
           resguardosBody.innerHTML += `
-            <tr>
-              <td>${formatDate(pkg.entryDate)}</td>
+            <tr class="${isOverWeek ? 'over-week' : ''}">
+              <td>${entryDisplay}</td>
               <td><small>${pkg.tracking}</small></td>
-              <td>${pkg.description}</td>
+              <td>${pkg.description || '---'}</td>
             </tr>
           `;
         });
@@ -582,7 +687,7 @@
       // Renderizar Entregados
       const entregadosBody = document.getElementById('searchEntregadosBody');
       entregadosBody.innerHTML = '';
-      const listEntregados = filtered.filter(p => p.status === 'Entregado');
+      const listEntregados = sortedFiltered.filter(p => p.status === 'Entregado');
       if (listEntregados.length === 0) {
         entregadosBody.innerHTML = `<tr><td colspan="3" class="empty-message">Sin paquetes firmados.</td></tr>`;
       } else {
@@ -591,7 +696,7 @@
             <tr>
               <td>${formatDate(pkg.signedDate)}</td>
               <td><small>${pkg.tracking}</small></td>
-              <td>${pkg.description}</td>
+              <td>${pkg.description || '---'}</td>
             </tr>
           `;
         });
