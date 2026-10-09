@@ -21,15 +21,15 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding: 15px; max-width: 1300px; margin: 0 auto; }
+    body { background-color: var(--bg); color: var(--text); padding: 15px; max-width: 1350px; margin: 0 auto; }
     h1 { text-align: center; margin-bottom: 5px; color: #0f172a; font-size: 1.6rem; }
     .status-cloud { font-size: 0.85rem; text-align: center; margin-bottom: 20px; color: #16a34a; font-weight: bold; }
     
-    .grid-container { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
-    @media (max-width: 900px) { .grid-container { grid-template-columns: 1fr; } }
+    .grid-container { display: grid; grid-template-columns: 1fr 2.2fr; gap: 20px; }
+    @media (max-width: 950px) { .grid-container { grid-template-columns: 1fr; } }
 
     .card { background: var(--card-bg); border-radius: 10px; padding: 18px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid var(--border); margin-bottom: 20px; }
-    .card h2 { font-size: 1.15rem; margin-bottom: 14px; color: #334155; border-bottom: 2px solid var(--bg); padding-bottom: 8px; }
+    .card h2 { font-size: 1.15rem; margin-bottom: 14px; color: #334155; border-bottom: 2px solid var(--bg); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
     
     .form-group { margin-bottom: 12px; }
     label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.85rem; }
@@ -40,7 +40,6 @@
     
     .btn-action { padding: 5px 10px; font-size: 0.8rem; width: auto; background-color: var(--success); }
     .btn-edit { background-color: #0284c7; padding: 5px 10px; font-size: 0.8rem; width: auto; margin-right: 4px; }
-    .btn-edit-phone { background-color: #64748b; padding: 2px 6px; font-size: 0.7rem; border-radius: 4px; width: auto; margin-top: 3px; display: inline-block; }
     .btn-restore { background-color: #0284c7; padding: 8px 12px; font-size: 0.85rem; }
 
     .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
@@ -63,24 +62,29 @@
     .empty-message { text-align: center; color: #94a3b8; padding: 15px; }
     .section-subtitle { font-size: 0.95rem; font-weight: bold; margin-top: 15px; margin-bottom: 6px; color: #475569; border-left: 3px solid var(--primary); padding-left: 8px; }
     
+    .pkg-number { display: inline-block; background: #e2e8f0; color: #334155; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-right: 5px; }
+
     /* Modal de Edición */
     .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
     .modal-content { background-color: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
     .modal-header { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; color: #1e293b; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
     .modal-actions { display: flex; gap: 10px; margin-top: 15px; }
     .btn-cancel { background-color: #64748b; }
+    
+    .report-filters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    @media (max-width: 600px) { .report-filters { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
 
-  <h1>📦 Control de Paquetes, Resguardos y Anomalías</h1>
-  <div class="status-cloud">☁️ Sincronización en la Nube Activa (Celular & PC)</div>
+  <h1>📦 Control de Paquetes y Resguardos</h1>
+  <div class="status-cloud">☁️ Sincronización en Tiempo Real Activa</div>
 
   <div class="grid-container">
     <div>
       <!-- Buscador -->
       <div class="card">
-        <h2>🔍 Buscador por Nombre, Teléfono o Guía</h2>
+        <h2>🔍 Buscador General</h2>
         <div class="form-group">
           <input type="text" id="searchInput" placeholder="Escribe nombre, teléfono o # guía..." oninput="searchPackages()">
         </div>
@@ -88,23 +92,13 @@
         <div id="searchResults" style="display: none;">
           <div class="stats-container">
             <div class="stat-box danger"><div>Anomalías</div><div class="stat-number" id="statAnomalies">0</div></div>
-            <div class="stat-box warning"><div>Resguardos</div><div class="stat-number" id="statPending">0</div></div>
+            <div class="stat-box warning"><div>En Resguardo</div><div class="stat-number" id="statPending">0</div></div>
             <div class="stat-box success"><div>Entregados</div><div class="stat-number" id="statSigned">0</div></div>
           </div>
 
-          <div class="section-subtitle">⚠️ Registro de Anomalías:</div>
+          <div class="section-subtitle">📦 Registros Encontrados:</div>
           <div style="overflow-x: auto;">
-            <table><thead><tr><th>Fecha</th><th>Guía</th><th>Motivo</th></tr></thead><tbody id="searchAnomaliesBody"></tbody></table>
-          </div>
-
-          <div class="section-subtitle">📦 Registro de Resguardos:</div>
-          <div style="overflow-x: auto;">
-            <table><thead><tr><th>Fecha Ingreso</th><th>Guía</th><th>Cliente / Propietario</th></tr></thead><tbody id="searchResguardosBody"></tbody></table>
-          </div>
-
-          <div class="section-subtitle">✅ Paquetes Entregados:</div>
-          <div style="overflow-x: auto;">
-            <table><thead><tr><th>Fecha Firma</th><th>Guía</th><th>Cliente / Propietario</th></tr></thead><tbody id="searchEntregadosBody"></tbody></table>
+            <table><thead><tr><th>Fecha</th><th>Guía</th><th>Cliente</th><th>Estado</th></tr></thead><tbody id="searchResultsBody"></tbody></table>
           </div>
         </div>
       </div>
@@ -134,7 +128,7 @@
         </form>
       </div>
 
-      <!-- Cargar Respaldo inicial -->
+      <!-- Cargar Respaldo -->
       <div class="card">
         <h2>📤 Cargar Respaldo Guardado</h2>
         <button type="button" class="btn-restore" onclick="document.getElementById('fileInput').click()">Subir archivo .json a la Nube</button>
@@ -154,16 +148,39 @@
         </div>
       </div>
 
-      <!-- General -->
+      <!-- Tabla Principal (Solo Paquetes Activos en Resguardo) -->
       <div class="card">
-        <h2>📋 Todos los Paquetes Registrados</h2>
+        <h2>
+          <span>📋 Paquetes Activos en Resguardo</span>
+          <span style="background: #2563eb; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.9rem;" id="activeResguardoCount">Total: 0</span>
+        </h2>
         <div style="overflow-x: auto;">
           <table>
-            <thead><tr><th>Cliente / Tel.</th><th>Guía</th><th>Descripción</th><th>Estado</th><th>Fecha Ingreso</th><th>Fecha Firma</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>#</th><th>Cliente / Tel.</th><th>Guía</th><th>Descripción</th><th>Estado</th><th>Fecha Ingreso</th><th>Días en Resguardo</th><th>Acciones</th></tr></thead>
             <tbody id="generalTableBody"></tbody>
           </table>
         </div>
       </div>
+
+      <!-- Reporte e Histórico por Cliente -->
+      <div class="card">
+        <h2>📊 Reporte e Historial Entregados por Cliente</h2>
+        <div class="report-filters">
+          <div><label>Buscar Cliente</label><input type="text" id="reportClientInput" placeholder="Nombre cliente..." oninput="generateClientReport()"></div>
+          <div><label>Fecha Inicio</label><input type="date" id="reportStartDate" onchange="generateClientReport()"></div>
+          <div><label>Fecha Fin</label><input type="date" id="reportEndDate" onchange="generateClientReport()"></div>
+        </div>
+        <div id="reportSummary" style="font-weight: bold; margin-bottom: 10px; color: #1e3a8a;"></div>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead><tr><th>Guía</th><th>Cliente</th><th>Fecha Ingreso</th><th>Fecha Entrega / Firma</th><th>Descripción</th></tr></thead>
+            <tbody id="reportTableBody">
+              <tr><td colspan="5" class="empty-message">Escribe el nombre de un cliente arriba para ver sus entregas.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -203,6 +220,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       setCurrentDate();
+      setDefaultReportDates();
       listenToFirebase();
     });
 
@@ -217,6 +235,7 @@
         }
         renderTables();
         searchPackages();
+        generateClientReport();
       });
     }
 
@@ -226,18 +245,32 @@
       document.getElementById('entryDate').value = now.toISOString().slice(0, 16);
     }
 
+    function setDefaultReportDates() {
+      const today = new Date();
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      document.getElementById('reportStartDate').value = firstDay.toISOString().slice(0, 10);
+      document.getElementById('reportEndDate').value = today.toISOString().slice(0, 10);
+    }
+
     function toggleAnomalyNote() {
       const status = document.getElementById('status').value;
       document.getElementById('anomalyGroup').style.display = status === 'Anomalía' ? 'block' : 'none';
     }
 
+    function calculateDaysInStorage(entryDateStr) {
+      if (!entryDateStr) return '---';
+      const entry = new Date(entryDateStr);
+      const now = new Date();
+      const diffTime = Math.abs(now - entry);
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return 'Hoy';
+      if (diffDays === 1) return '1 día';
+      return `${diffDays} días`;
+    }
+
     function isOlderThanOneWeek(entryDateStr) {
       if (!entryDateStr) return false;
       return (new Date().getTime() - new Date(entryDateStr).getTime()) > (7 * 24 * 60 * 60 * 1000);
-    }
-
-    function getSortedPackages(list) {
-      return [...list].sort((a, b) => new Date(b.entryDate || b.id) - new Date(a.entryDate || a.id));
     }
 
     document.getElementById('packageForm').addEventListener('submit', (e) => {
@@ -293,7 +326,6 @@
       reader.readAsText(file);
     }
 
-    // Funciones del Modal de Edición Completa
     function openEditModal(key) {
       const pkg = packages.find(p => p.firebaseKey === key);
       if (!pkg) return;
@@ -327,16 +359,9 @@
       };
 
       db.ref('packages/' + key).update(updatedData, (error) => {
-        if (!error) {
-          closeEditModal();
-        } else {
-          alert('Error al actualizar los datos');
-        }
+        if (!error) closeEditModal();
+        else alert('Error al actualizar los datos');
       });
-    }
-
-    function editAltPhone(key) {
-      openEditModal(key);
     }
 
     function markAsDelivered(key) {
@@ -368,32 +393,44 @@
       renderAnomaliesTable();
     }
 
+    // Tabla principal solo con paquetes EN RESGUARDADO (Enumerados en orden cronológico)
     function renderGeneralTable() {
       const tbody = document.getElementById('generalTableBody');
       tbody.innerHTML = '';
-      if (packages.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-message">No hay registros aún.</td></tr>`;
+      
+      // Filtrar únicamente los resguardados activos
+      const activePackages = packages.filter(p => p.status === 'Resguardado');
+      
+      // Ordenar cronológicamente (Del más viejo al más reciente)
+      activePackages.sort((a, b) => new Date(a.entryDate || a.id) - new Date(b.entryDate || b.id));
+
+      document.getElementById('activeResguardoCount').textContent = `Total: ${activePackages.length}`;
+
+      if (activePackages.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-message">No hay paquetes activos en resguardo.</td></tr>`;
         return;
       }
 
-      getSortedPackages(packages).forEach(pkg => {
+      activePackages.forEach((pkg, index) => {
+        const pkgNum = index + 1; // #1 es el más viejo
         const tr = document.createElement('tr');
-        const isOverWeek = pkg.status !== 'Entregado' && isOlderThanOneWeek(pkg.entryDate);
+        const isOverWeek = isOlderThanOneWeek(pkg.entryDate);
         if (isOverWeek) tr.classList.add('over-week');
 
-        let badgeClass = pkg.status === 'Entregado' ? 'badge-entregado' : (pkg.status === 'Anomalía' ? 'badge-anomalia' : 'badge-resguardo');
-        const entryDateDisplay = isOverWeek ? `<span class="text-over-week">${formatDate(pkg.entryDate)}<br><small style="font-size:0.75rem;">⚠️ +7 días</small></span>` : formatDate(pkg.entryDate);
+        const daysText = calculateDaysInStorage(pkg.entryDate);
+        const daysDisplay = isOverWeek ? `<span class="text-over-week">${daysText}<br><small style="font-size:0.75rem;">⚠️ +7 días</small></span>` : daysText;
 
         tr.innerHTML = `
+          <td><span class="pkg-number">#${pkgNum}</span></td>
           <td><strong>${pkg.person}</strong><br>${formatPhoneDisplay(pkg)}</td>
           <td><small>${pkg.tracking}</small></td>
           <td>${pkg.description || '---'}</td>
-          <td><span class="badge ${badgeClass}">${pkg.status}</span></td>
-          <td>${entryDateDisplay}</td>
-          <td>${formatDate(pkg.signedDate)}</td>
+          <td><span class="badge badge-resguardo">${pkg.status}</span></td>
+          <td>${formatDate(pkg.entryDate)}</td>
+          <td><strong>${daysDisplay}</strong></td>
           <td style="white-space: nowrap;">
             <button class="btn-edit" onclick="openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
-            ${pkg.status !== 'Entregado' ? `<button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">Firmar / Entregar</button>` : '✅ Entregado'}
+            <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">Firmar / Entregar</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -410,7 +447,7 @@
         return;
       }
 
-      getSortedPackages(anomalies).forEach(pkg => {
+      anomalies.sort((a, b) => new Date(b.entryDate || b.id) - new Date(a.entryDate || a.id)).forEach(pkg => {
         const tr = document.createElement('tr');
         if (isOlderThanOneWeek(pkg.entryDate)) tr.classList.add('over-week');
 
@@ -434,12 +471,12 @@
       const resultsContainer = document.getElementById('searchResults');
       if (!query) { resultsContainer.style.display = 'none'; return; }
 
-      const filtered = getSortedPackages(packages.filter(p => 
+      const filtered = packages.filter(p => 
         p.person.toLowerCase().includes(query) ||
         p.phone.toLowerCase().includes(query) ||
         (p.altPhone && p.altPhone.toLowerCase().includes(query)) ||
         p.tracking.toLowerCase().includes(query)
-      ));
+      );
 
       resultsContainer.style.display = 'block';
 
@@ -447,16 +484,61 @@
       document.getElementById('statPending').textContent = filtered.filter(p => p.status === 'Resguardado').length;
       document.getElementById('statSigned').textContent = filtered.filter(p => p.status === 'Entregado').length;
 
-      const resguardosBody = document.getElementById('searchResguardosBody');
-      resguardosBody.innerHTML = '';
-      filtered.filter(p => p.status === 'Resguardado').forEach(pkg => {
-        resguardosBody.innerHTML += `<tr><td>${formatDate(pkg.entryDate)}</td><td><small>${pkg.tracking}</small></td><td><strong>${pkg.person}</strong><br><small style="color:#64748b">${pkg.phone}</small></td></tr>`;
+      const body = document.getElementById('searchResultsBody');
+      body.innerHTML = '';
+      if(filtered.length === 0) {
+        body.innerHTML = `<tr><td colspan="4" class="empty-message">No se encontraron resultados.</td></tr>`;
+      } else {
+        filtered.forEach(pkg => {
+          body.innerHTML += `<tr><td>${formatDate(pkg.entryDate)}</td><td><small>${pkg.tracking}</small></td><td><strong>${pkg.person}</strong></td><td>${pkg.status}</td></tr>`;
+        });
+      }
+    }
+
+    // Generador de Reporte e Historial por Cliente y Rango de Fechas
+    function generateClientReport() {
+      const clientName = document.getElementById('reportClientInput').value.trim().toLowerCase();
+      const startDateStr = document.getElementById('reportStartDate').value;
+      const endDateStr = document.getElementById('reportEndDate').value;
+      const tbody = document.getElementById('reportTableBody');
+      const summaryDiv = document.getElementById('reportSummary');
+
+      if (!clientName) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">Escribe el nombre de un cliente arriba para ver sus entregas.</td></tr>`;
+        summaryDiv.textContent = '';
+        return;
+      }
+
+      const startDate = startDateStr ? new Date(startDateStr + 'T00:00:00') : new Date('2000-01-01');
+      const endDate = endDateStr ? new Date(endDateStr + 'T23:59:59') : new Date('2099-12-31');
+
+      const clientDeliveredPackages = packages.filter(p => {
+        const matchesClient = p.person.toLowerCase().includes(clientName);
+        const matchesStatus = p.status === 'Entregado';
+        const signDate = p.signedDate ? new Date(p.signedDate) : new Date(p.entryDate);
+        const matchesDate = signDate >= startDate && signDate <= endDate;
+
+        return matchesClient && matchesStatus && matchesDate;
       });
 
-      const entregadosBody = document.getElementById('searchEntregadosBody');
-      entregadosBody.innerHTML = '';
-      filtered.filter(p => p.status === 'Entregado').forEach(pkg => {
-        entregadosBody.innerHTML += `<tr><td>${formatDate(pkg.signedDate)}</td><td><small>${pkg.tracking}</small></td><td><strong>${pkg.person}</strong><br><small style="color:#64748b">${pkg.phone}</small></td></tr>`;
+      summaryDiv.textContent = `📊 Paquetes Entregados / Firmados a "${document.getElementById('reportClientInput').value}": ${clientDeliveredPackages.length} paquete(s) en este período.`;
+
+      tbody.innerHTML = '';
+      if (clientDeliveredPackages.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay paquetes entregados a este cliente en el rango de fechas seleccionado.</td></tr>`;
+        return;
+      }
+
+      clientDeliveredPackages.forEach(pkg => {
+        tbody.innerHTML += `
+          <tr>
+            <td><small>${pkg.tracking}</small></td>
+            <td><strong>${pkg.person}</strong></td>
+            <td>${formatDate(pkg.entryDate)}</td>
+            <td><span style="color:#16a34a; font-weight:bold;">${formatDate(pkg.signedDate)}</span></td>
+            <td>${pkg.description || '---'}</td>
+          </tr>
+        `;
       });
     }
   </script>
