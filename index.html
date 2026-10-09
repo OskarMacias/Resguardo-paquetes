@@ -393,26 +393,27 @@
       renderAnomaliesTable();
     }
 
-    // Tabla principal solo con paquetes EN RESGUARDADO (Enumerados en orden cronológico)
+    // Tabla principal: El más reciente está arriba, el más antiguo abajo (#1 es el más antiguo)
     function renderGeneralTable() {
       const tbody = document.getElementById('generalTableBody');
       tbody.innerHTML = '';
       
-      // Filtrar únicamente los resguardados activos
       const activePackages = packages.filter(p => p.status === 'Resguardado');
-      
-      // Ordenar cronológicamente (Del más viejo al más reciente)
-      activePackages.sort((a, b) => new Date(a.entryDate || a.id) - new Date(b.entryDate || b.id));
+      const totalCount = activePackages.length;
 
-      document.getElementById('activeResguardoCount').textContent = `Total: ${activePackages.length}`;
+      document.getElementById('activeResguardoCount').textContent = `Total: ${totalCount}`;
 
-      if (activePackages.length === 0) {
+      if (totalCount === 0) {
         tbody.innerHTML = `<tr><td colspan="8" class="empty-message">No hay paquetes activos en resguardo.</td></tr>`;
         return;
       }
 
+      // Ordenar de MÁS RECIENTE a MÁS ANTIGUO (para que el más nuevo quede arriba)
+      activePackages.sort((a, b) => new Date(b.entryDate || b.id) - new Date(a.entryDate || a.id));
+
       activePackages.forEach((pkg, index) => {
-        const pkgNum = index + 1; // #1 es el más viejo
+        // Asignar número: El de arriba (más reciente) es totalCount - index, el de más abajo es #1
+        const pkgNum = totalCount - index;
         const tr = document.createElement('tr');
         const isOverWeek = isOlderThanOneWeek(pkg.entryDate);
         if (isOverWeek) tr.classList.add('over-week');
@@ -495,7 +496,6 @@
       }
     }
 
-    // Generador de Reporte e Historial por Cliente y Rango de Fechas
     function generateClientReport() {
       const clientName = document.getElementById('reportClientInput').value.trim().toLowerCase();
       const startDateStr = document.getElementById('reportStartDate').value;
