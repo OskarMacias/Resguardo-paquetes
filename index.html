@@ -175,7 +175,7 @@
       color: #64748b;
     }
 
-    /* Resaltado de filas de paquetes con más de 1 semana en resguardo */
+    /* Resaltado de filas con más de 1 semana en resguardo */
     tr.over-week {
       background-color: #fef2f2 !important;
     }
@@ -220,53 +220,9 @@
 
   <div class="grid-container">
     
-    <!-- COLUMNA IZQUIERDA: FORMULARIOS Y BUSCADOR -->
+    <!-- COLUMNA IZQUIERDA: BUSCADOR ARRIBA Y FORMULARIO ABAJO -->
     <div>
-      <!-- Formulario de Registro -->
-      <div class="card">
-        <h2>Registrar Paquete / Anomalía</h2>
-        <form id="packageForm">
-          <div class="form-group">
-            <label for="trackingNum">Número de Guía</label>
-            <input type="text" id="trackingNum" placeholder="Ej. JT123456789" required>
-          </div>
-          <div class="form-group">
-            <label for="personName">Nombre de la persona</label>
-            <input type="text" id="personName" placeholder="Ej. Juan Pérez" required>
-          </div>
-          <div class="form-group">
-            <label for="phone">Teléfono (Original / Guía)</label>
-            <input type="tel" id="phone" placeholder="Ej. 6671234567" required>
-          </div>
-          <div class="form-group">
-            <label for="altPhone">Teléfono Alternativo / Correcto <small style="color: #64748b; font-weight: normal;">(Opcional)</small></label>
-            <input type="tel" id="altPhone" placeholder="Ej. 6679998877 (En caso de estar mal el original)">
-          </div>
-          <div class="form-group">
-            <label for="description">Descripción / Contenido <small style="color: #64748b; font-weight: normal;">(Opcional)</small></label>
-            <input type="text" id="description" placeholder="Ej. Caja Shein, Bolsa Temu (Opcional)">
-          </div>
-          <div class="form-group">
-            <label for="status">Estado del Paquete</label>
-            <select id="status" onchange="toggleAnomalyNote()">
-              <option value="Resguardado">En Resguardo</option>
-              <option value="Anomalía">Anomalía (No entregado hoy)</option>
-              <option value="Entregado">Entregado / Firmado</option>
-            </select>
-          </div>
-          <div class="form-group" id="anomalyGroup" style="display: none;">
-            <label for="anomalyNote">Motivo de Anomalía</label>
-            <input type="text" id="anomalyNote" placeholder="Ej. Dirección no encontrada, cliente no estaba">
-          </div>
-          <div class="form-group">
-            <label for="entryDate">Fecha de Registro</label>
-            <input type="datetime-local" id="entryDate" required>
-          </div>
-          <button type="submit">Guardar Registro</button>
-        </form>
-      </div>
-
-      <!-- Buscador Inteligente -->
+      <!-- Buscador Inteligente (Ahora arriba) -->
       <div class="card">
         <h2>🔍 Buscador por Nombre, Teléfono o Guía</h2>
         <div class="form-group">
@@ -336,6 +292,50 @@
 
         </div>
       </div>
+
+      <!-- Formulario de Registro -->
+      <div class="card">
+        <h2>Registrar Paquete / Anomalía</h2>
+        <form id="packageForm">
+          <div class="form-group">
+            <label for="trackingNum">Número de Guía</label>
+            <input type="text" id="trackingNum" placeholder="Ej. JT123456789" required>
+          </div>
+          <div class="form-group">
+            <label for="personName">Nombre de la persona</label>
+            <input type="text" id="personName" placeholder="Ej. Juan Pérez" required>
+          </div>
+          <div class="form-group">
+            <label for="phone">Teléfono (Original / Guía)</label>
+            <input type="tel" id="phone" placeholder="Ej. 6671234567" required>
+          </div>
+          <div class="form-group">
+            <label for="altPhone">Teléfono Alternativo / Correcto <small style="color: #64748b; font-weight: normal;">(Opcional)</small></label>
+            <input type="tel" id="altPhone" placeholder="Ej. 6679998877 (En caso de estar mal el original)">
+          </div>
+          <div class="form-group">
+            <label for="description">Descripción / Contenido <small style="color: #64748b; font-weight: normal;">(Opcional)</small></label>
+            <input type="text" id="description" placeholder="Ej. Caja Shein, Bolsa Temu (Opcional)">
+          </div>
+          <div class="form-group">
+            <label for="status">Estado del Paquete</label>
+            <select id="status" onchange="toggleAnomalyNote()">
+              <option value="Resguardado">En Resguardo</option>
+              <option value="Anomalía">Anomalía (No entregado hoy)</option>
+              <option value="Entregado">Entregado / Firmado</option>
+            </select>
+          </div>
+          <div class="form-group" id="anomalyGroup" style="display: none;">
+            <label for="anomalyNote">Motivo de Anomalía</label>
+            <input type="text" id="anomalyNote" placeholder="Ej. Dirección no encontrada, cliente no estaba">
+          </div>
+          <div class="form-group">
+            <label for="entryDate">Fecha de Registro</label>
+            <input type="datetime-local" id="entryDate" required>
+          </div>
+          <button type="submit">Guardar Registro</button>
+        </form>
+      </div>
     </div>
 
     <!-- COLUMNA DERECHA: TABLAS GENERALES Y ANOMALÍAS -->
@@ -403,18 +403,21 @@
       group.style.display = status === 'Anomalía' ? 'block' : 'none';
     }
 
-    // Comprobar si han pasado más de 7 días (1 semana)
     function isOlderThanOneWeek(entryDateStr) {
       if (!entryDateStr) return false;
-      const entryDate = new Date(entryDateStr).getTime();
-      const now = new Date().getTime();
+      const entryTime = new Date(entryDateStr).getTime();
+      const nowTime = new Date().getTime();
       const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
-      return (now - entryDate) > sevenDaysInMs;
+      return (nowTime - entryTime) > sevenDaysInMs;
     }
 
-    // Ordenar paquetes: fecha más actual arriba, más antigua abajo
+    // Función de ordenamiento estricta: Más reciente primero (arriba), más antiguo al final (abajo)
     function getSortedPackages(list) {
-      return [...list].sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
+      return [...list].sort((a, b) => {
+        const timeA = new Date(a.entryDate || a.id).getTime();
+        const timeB = new Date(b.entryDate || b.id).getTime();
+        return timeB - timeA;
+      });
     }
 
     // Guardar nuevo registro
@@ -542,7 +545,6 @@
       sortedList.forEach(pkg => {
         const tr = document.createElement('tr');
 
-        // Evaluar si lleva más de una semana pendiente
         const isOverWeek = pkg.status !== 'Entregado' && isOlderThanOneWeek(pkg.entryDate);
         if (isOverWeek) {
           tr.classList.add('over-week');
@@ -613,7 +615,7 @@
       });
     }
 
-    // Buscador Inteligente por Teléfono, Nombre o Guía
+    // Buscador Inteligente
     function searchPackages() {
       const query = document.getElementById('searchInput').value.trim().toLowerCase();
       const resultsContainer = document.getElementById('searchResults');
