@@ -175,6 +175,7 @@
       color: #64748b;
     }
 
+    /* Resaltado de filas con más de 1 semana en resguardo */
     tr.over-week {
       background-color: #fef2f2 !important;
     }
@@ -221,7 +222,7 @@
     
     <!-- COLUMNA IZQUIERDA: BUSCADOR ARRIBA Y FORMULARIO ABAJO -->
     <div>
-      <!-- Buscador Inteligente -->
+      <!-- Buscador Inteligente (Ahora arriba) -->
       <div class="card">
         <h2>🔍 Buscador por Nombre, Teléfono o Guía</h2>
         <div class="form-group">
@@ -267,7 +268,7 @@
                 <tr>
                   <th>Fecha Ingreso</th>
                   <th>Guía</th>
-                  <th>Cliente / Propietario</th>
+                  <th>Descripción</th>
                 </tr>
               </thead>
               <tbody id="searchResguardosBody"></tbody>
@@ -282,7 +283,7 @@
                 <tr>
                   <th>Fecha Firma</th>
                   <th>Guía</th>
-                  <th>Cliente / Propietario</th>
+                  <th>Descripción</th>
                 </tr>
               </thead>
               <tbody id="searchEntregadosBody"></tbody>
@@ -410,6 +411,7 @@
       return (nowTime - entryTime) > sevenDaysInMs;
     }
 
+    // Función de ordenamiento estricta: Más reciente primero (arriba), más antiguo al final (abajo)
     function getSortedPackages(list) {
       return [...list].sort((a, b) => {
         const timeA = new Date(a.entryDate || a.id).getTime();
@@ -418,6 +420,7 @@
       });
     }
 
+    // Guardar nuevo registro
     document.getElementById('packageForm').addEventListener('submit', (e) => {
       e.preventDefault();
 
@@ -448,6 +451,7 @@
       saveData();
       renderTables();
 
+      // Limpiar formulario
       document.getElementById('trackingNum').value = '';
       document.getElementById('personName').value = '';
       document.getElementById('phone').value = '';
@@ -459,6 +463,7 @@
       setCurrentDate();
     });
 
+    // Editar o agregar teléfono alternativo
     function editAltPhone(id) {
       const pkg = packages.find(p => p.id === id);
       if (pkg) {
@@ -473,6 +478,7 @@
       }
     }
 
+    // Cambiar estado a "Entregado"
     function markAsDelivered(id) {
       const pkg = packages.find(p => p.id === id);
       if (pkg) {
@@ -486,7 +492,218 @@
       }
     }
 
+    // Cambiar estado de Anomalía a Resguardo
     function markAsResguardo(id) {
       const pkg = packages.find(p => p.id === id);
       if (pkg) {
-        pkg.status = 'Res
+        pkg.status = 'Resguardado';
+        saveData();
+        renderTables();
+        searchPackages();
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem('packages_v2_data', JSON.stringify(packages));
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '---';
+      const date = new Date(dateStr);
+      return date.toLocaleString('es-ES', { 
+        year: 'numeric', month: '2-digit', day: '2-digit', 
+        hour: '2-digit', minute: '2-digit' 
+      });
+    }
+
+    function formatPhoneDisplay(pkg) {
+      let html = `<small style="color:#64748b">${pkg.phone}</small>`;
+      if (pkg.altPhone) {
+        html += `<br><small style="color:#2563eb; font-weight:bold;">Alt: ${pkg.altPhone}</small>`;
+      }
+      html += `<br><button class="btn-edit-phone" onclick="editAltPhone(${pkg.id})">✏️ Tel. Alt.</button>`;
+      return html;
+    }
+
+    // Renderizado General
+    function renderTables() {
+      renderGeneralTable();
+      renderAnomaliesTable();
+    }
+
+    function renderGeneralTable() {
+      const tbody = document.getElementById('generalTableBody');
+      tbody.innerHTML = '';
+
+      if (packages.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-message">No hay registros aún.</td></tr>`;
+        return;
+      }
+
+      const sortedList = getSortedPackages(packages);
+
+      sortedList.forEach(pkg => {
+        const tr = document.createElement('tr');
+
+        const isOverWeek = pkg.status !== 'Entregado' && isOlderThanOneWeek(pkg.entryDate);
+        if (isOverWeek) {
+          tr.classList.add('over-week');
+        }
+
+        let badgeClass = 'badge-resguardo';
+        if (pkg.status === 'Entregado') badgeClass = 'badge-entregado';
+        if (pkg.status === 'Anomalía') badgeClass = 'badge-anomalia';
+
+        const entryDateFormatted = formatDate(pkg.entryDate);
+        const entryDateDisplay = isOverWeek 
+          ? `<span class="text-over-week">${entryDateFormatted}<br><small style="font-size:0.75rem;">⚠️ +7 días</small></span>` 
+          : entryDateFormatted;
+
+        tr.innerHTML = `
+          <td><strong>${pkg.person}</strong><br>${formatPhoneDisplay(pkg)}</td>
+          <td><small>${pkg.tracking}</small></td>
+          <td>${pkg.description || '---'}</td>
+          <td><span class="badge ${badgeClass}">${pkg.status}</span></td>
+          <td>${entryDateDisplay}</td>
+          <td>${formatDate(pkg.signedDate)}</td>
+          <td>
+            ${pkg.status !== 'Entregado' 
+              ? `<button class="btn-action" onclick="markAsDelivered(${pkg.id})">Firmar / Entregar</button>` 
+              : '✅ Entregado'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderAnomaliesTable() {
+      const tbody = document.getElementById('anomaliesTableBody');
+      tbody.innerHTML = '';
+
+      const anomalies = packages.filter(p => p.status === 'Anomalía');
+
+      if (anomalies.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay anomalías registradas actualmente.</td></tr>`;
+        return;
+      }
+
+      const sortedAnomalies = getSortedPackages(anomalies);
+
+      sortedAnomalies.forEach(pkg => {
+        const tr = document.createElement('tr');
+        const isOverWeek = isOlderThanOneWeek(pkg.entryDate);
+        if (isOverWeek) {
+          tr.classList.add('over-week');
+        }
+
+        const anomalyDateFormatted = formatDate(pkg.anomalyDate || pkg.entryDate);
+        const anomalyDateDisplay = isOverWeek 
+          ? `<span class="text-over-week">${anomalyDateFormatted}<br><small style="font-size:0.75rem;">⚠️ +7 días</small></span>` 
+          : anomalyDateFormatted;
+
+        tr.innerHTML = `
+          <td>${anomalyDateDisplay}</td>
+          <td><strong>${pkg.person}</strong><br>${formatPhoneDisplay(pkg)}</td>
+          <td><small>${pkg.tracking}</small></td>
+          <td><span style="color:#dc2626; font-weight:bold;">${pkg.anomalyNote || 'Sin motivo'}</span></td>
+          <td>
+            <button class="btn-action" style="background:#d97706; margin-bottom: 2px;" onclick="markAsResguardo(${pkg.id})">A Resguardo</button>
+            <button class="btn-action" onclick="markAsDelivered(${pkg.id})">Entregar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Buscador Inteligente
+    function searchPackages() {
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+      const resultsContainer = document.getElementById('searchResults');
+
+      if (!query) {
+        resultsContainer.style.display = 'none';
+        return;
+      }
+
+      const filtered = packages.filter(p => 
+        p.person.toLowerCase().includes(query) ||
+        p.phone.toLowerCase().includes(query) ||
+        (p.altPhone && p.altPhone.toLowerCase().includes(query)) ||
+        p.tracking.toLowerCase().includes(query)
+      );
+
+      const sortedFiltered = getSortedPackages(filtered);
+
+      resultsContainer.style.display = 'block';
+
+      // Conteo de Stats
+      const anomalyCount = sortedFiltered.filter(p => p.status === 'Anomalía').length;
+      const pendingCount = sortedFiltered.filter(p => p.status === 'Resguardado').length;
+      const signedCount  = sortedFiltered.filter(p => p.status === 'Entregado').length;
+
+      document.getElementById('statAnomalies').textContent = anomalyCount;
+      document.getElementById('statPending').textContent = pendingCount;
+      document.getElementById('statSigned').textContent = signedCount;
+
+      // Renderizar Anomalías
+      const anomaliesBody = document.getElementById('searchAnomaliesBody');
+      anomaliesBody.innerHTML = '';
+      const listAnomalies = sortedFiltered.filter(p => p.anomalyDate || p.status === 'Anomalía');
+      if (listAnomalies.length === 0) {
+        anomaliesBody.innerHTML = `<tr><td colspan="3" class="empty-message">Sin fechas de anomalías.</td></tr>`;
+      } else {
+        listAnomalies.forEach(pkg => {
+          anomaliesBody.innerHTML += `
+            <tr>
+              <td>${formatDate(pkg.anomalyDate || pkg.entryDate)}</td>
+              <td><small>${pkg.tracking}</small></td>
+              <td>${pkg.anomalyNote || 'Anomalía del día'}</td>
+            </tr>
+          `;
+        });
+      }
+
+      // Renderizar Resguardos
+      const resguardosBody = document.getElementById('searchResguardosBody');
+      resguardosBody.innerHTML = '';
+      const listResguardos = sortedFiltered.filter(p => p.status === 'Resguardado');
+      if (listResguardos.length === 0) {
+        resguardosBody.innerHTML = `<tr><td colspan="3" class="empty-message">Sin paquetes en resguardo.</td></tr>`;
+      } else {
+        listResguardos.forEach(pkg => {
+          const isOverWeek = isOlderThanOneWeek(pkg.entryDate);
+          const entryDisplay = isOverWeek 
+            ? `<span class="text-over-week">${formatDate(pkg.entryDate)} (⚠️ +7 días)</span>` 
+            : formatDate(pkg.entryDate);
+
+          resguardosBody.innerHTML += `
+            <tr class="${isOverWeek ? 'over-week' : ''}">
+              <td>${entryDisplay}</td>
+              <td><small>${pkg.tracking}</small></td>
+              <td>${pkg.description || '---'}</td>
+            </tr>
+          `;
+        });
+      }
+
+      // Renderizar Entregados
+      const entregadosBody = document.getElementById('searchEntregadosBody');
+      entregadosBody.innerHTML = '';
+      const listEntregados = sortedFiltered.filter(p => p.status === 'Entregado');
+      if (listEntregados.length === 0) {
+        entregadosBody.innerHTML = `<tr><td colspan="3" class="empty-message">Sin paquetes firmados.</td></tr>`;
+      } else {
+        listEntregados.forEach(pkg => {
+          entregadosBody.innerHTML += `
+            <tr>
+              <td>${formatDate(pkg.signedDate)}</td>
+              <td><small>${pkg.tracking}</small></td>
+              <td>${pkg.description || '---'}</td>
+            </tr>
+          `;
+        });
+      }
+    }
+  </script>
+</body>
+</html>
