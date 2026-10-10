@@ -139,7 +139,7 @@
           <div class="form-group" id="anomalyGroup" style="display: none;">
             <label>Motivo de Anomalía</label><input type="text" id="anomalyNote">
           </div>
-          <div class="form-group"><label>Foto de Evidencia (Opcional)</label><input type="file" id="evidencePhoto" accept="image/*" capture="environment"></div>
+          <div class="form-group"><label>Foto de Evidencia (Galería o Cámara)</label><input type="file" id="evidencePhoto" accept="image/*"></div>
           <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="entryDate" required></div>
           <button type="submit">Guardar Registro</button>
         </form>
@@ -224,7 +224,7 @@
     <div class="modal-content">
       <div class="modal-header">✍️ Firmar y Adjuntar Evidencia de Entrega</div>
       <input type="hidden" id="deliverKey">
-      <div class="form-group"><label>Foto / Captura de Evidencia (Opcional)</label><input type="file" id="deliverPhotoInput" accept="image/*" capture="environment"></div>
+      <div class="form-group"><label>Foto / Captura de Evidencia (Galería o Cámara)</label><input type="file" id="deliverPhotoInput" accept="image/*"></div>
       <div class="modal-actions">
         <button type="button" onclick="confirmDeliveryWithPhoto()">Confirmar Entrega</button>
         <button type="button" class="btn-cancel" onclick="closeDeliverModal()">Cancelar</button>
@@ -314,7 +314,6 @@
       return (new Date().getTime() - new Date(entryDateStr).getTime()) > (7 * 24 * 60 * 60 * 1000);
     }
 
-    // Convertir imagen seleccionada a formato liviano
     function compressAndConvertImage(fileInput) {
       return new Promise((resolve) => {
         const file = fileInput.files[0];
@@ -334,7 +333,7 @@
 
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.6)); // Calidad optimizada
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
           };
         };
       });
@@ -432,7 +431,6 @@
       });
     }
 
-    // Modal de Entrega con Foto
     function markAsDelivered(key) {
       document.getElementById('deliverKey').value = key;
       document.getElementById('deliverPhotoInput').value = '';
