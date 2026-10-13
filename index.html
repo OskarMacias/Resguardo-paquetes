@@ -46,10 +46,10 @@
     .btn-restore { background-color: #0284c7; padding: 8px 12px; font-size: 0.85rem; }
 
     .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
-    .stat-box { padding: 8px; border-radius: 8px; text-align: center; font-size: 0.75rem; }
-    .stat-box.success { background: #dcfce7; color: #14532d; }
-    .stat-box.warning { background: #fef3c7; color: #78350f; }
+    .stat-box { padding: 8px; border-radius: 8px; text-align: center; font-size: 0.75rem; font-weight: 600; }
     .stat-box.danger  { background: #fee2e2; color: #991b1b; }
+    .stat-box.warning { background: #fef3c7; color: #78350f; }
+    .stat-box.success { background: #dcfce7; color: #14532d; }
     .stat-number { font-size: 1.2rem; font-weight: bold; }
 
     table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
@@ -114,9 +114,9 @@
 
         <div id="searchResults" style="display: none;">
           <div class="stats-container">
-            <div class="stat-box danger"><div>Anomalías</div><div class="stat-number" id="statAnomalies">0</div></div>
-            <div class="stat-box warning"><div>En Resguardo</div><div class="stat-number" id="statPending">0</div></div>
-            <div class="stat-box success"><div>Entregados</div><div class="stat-number" id="statSigned">0</div></div>
+            <div class="stat-box danger"><div>🚨 Anomalías (No día 1)</div><div class="stat-number" id="statAnomalies">0</div></div>
+            <div class="stat-box warning"><div>📦 En Resguardo</div><div class="stat-number" id="statPending">0</div></div>
+            <div class="stat-box success"><div>✅ Entregados</div><div class="stat-number" id="statSigned">0</div></div>
           </div>
 
           <div class="section-subtitle">📦 Registros Encontrados:</div>
@@ -164,7 +164,7 @@
     </div>
 
     <div>
-      <!-- Control de Reincidencia de Clientes (con Editar y Borrar incorporados) -->
+      <!-- Control de Reincidencia de Clientes -->
       <div class="card" style="border-left: 4px solid var(--danger);">
         <h2>🚨 Análisis de Clientes Reincidentes (No recogen a tiempo)</h2>
         <div style="overflow-x: auto; max-height: 280px; overflow-y: auto;">
@@ -500,10 +500,11 @@
 
     function closeViewPhotoModal() { document.getElementById('viewPhotoModal').style.display = 'none'; }
 
-    function deleteAnomalyRecord(key, phone) {
-      const choice = confirm('⚠️ ¿Deseas ELIMINAR el último registro de anomalía de este cliente?\n\n- OPRIME "Aceptar" para borrar sólo la última anomalía.\n- O "Cancelar" para descartar.');
-      if (choice) {
-        db.ref('packages/' + key).remove();
+    function deleteAnomalyRecord(key) {
+      if (confirm('⚠️ ¿Deseas eliminar este registro de anomalía? Esta acción lo borrará de la base de datos.')) {
+        db.ref('packages/' + key).remove((error) => {
+          if (error) alert('Error al eliminar el registro.');
+        });
       }
     }
 
@@ -515,8 +516,9 @@
     function getClientTotals(phone) {
       const clientPkgs = packages.filter(p => p.phone === phone);
       const deliveredCount = clientPkgs.filter(p => p.status === 'Entregado').length;
+      const resguardoCount = clientPkgs.filter(p => p.status === 'Resguardado').length;
       const anomalyCount = clientPkgs.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
-      return { deliveredCount, anomalyCount };
+      return { deliveredCount, resguardoCount, anomalyCount };
     }
 
     function formatPhoneDisplay(pkg) {
@@ -559,7 +561,6 @@
         if (count >= 4) badgeClass = 'badge-high';
         else if (count >= 2) badgeClass = 'badge-medium';
 
-        // Ordenar items de más reciente a más antiguo
         const sortedItems = client.items.sort((a, b) => new Date(b.anomalyDate || b.entryDate) - new Date(a.anomalyDate || a.entryDate));
         const lastItem = sortedItems[0];
 
@@ -567,10 +568,8 @@
           .map(item => `<span class="date-tag">${formatDate(item.anomalyDate || item.entryDate)}</span>`)
           .join('');
 
-        // Conteo de Historial Completo
         const { deliveredCount, anomalyCount } = getClientTotals(client.phone);
 
-        // Frecuencia promedio
         let avgText = '1ra vez';
         if (count > 1) {
           const sortedDates = sortedItems.map(d => new Date(d.anomalyDate || d.entryDate)).sort((a, b) => a - b);
@@ -594,7 +593,7 @@
             <td><small style="font-weight:bold; color:#ea580c;">${avgText}</small></td>
             <td style="white-space: nowrap;">
               <button class="btn-edit" onclick="openEditModal('${lastItem.firebaseKey}')">✏️ Editar</button>
-              <button class="btn-delete" onclick="deleteAnomalyRecord('${lastItem.firebaseKey}', '${client.phone}')">🗑️ Borrar</button>
+              <button class="btn-delete" onclick="deleteAnomalyRecord('${lastItem.firebaseKey}')">🗑️ Borrar</button>
             </td>
           </tr>
         `;
@@ -658,9 +657,14 @@
 
       resultsContainer.style.display = 'block';
 
-      document.getElementById('statAnomalies').textContent = filtered.filter(p => p.status === 'Anomalía').length;
-      document.getElementById('statPending').textContent = filtered.filter(p => p.status === 'Resguardado').length;
-      document.getElementById('statSigned').textContent = filtered.filter(p => p.status === 'Entregado').length;
+      // Totales del cliente buscado
+      const totalAnomalies = filtered.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
+      const totalPending = filtered.filter(p => p.status === 'Resguardado').length;
+      const totalSigned = filtered.filter(p => p.status === 'Entregado').length;
+
+      document.getElementById('statAnomalies').textContent = totalAnomalies;
+      document.getElementById('statPending').textContent = totalPending;
+      document.getElementById('statSigned').textContent = totalSigned;
 
       const body = document.getElementById('searchResultsBody');
       body.innerHTML = '';
