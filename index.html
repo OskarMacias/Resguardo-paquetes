@@ -45,12 +45,17 @@
     .btn-photo { background-color: #8b5cf6; padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; display: inline-block; cursor: pointer; text-decoration: none; }
     .btn-restore { background-color: #0284c7; padding: 8px 12px; font-size: 0.85rem; }
 
-    .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
+    .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
     .stat-box { padding: 8px; border-radius: 8px; text-align: center; font-size: 0.75rem; font-weight: 600; }
     .stat-box.danger  { background: #fee2e2; color: #991b1b; }
     .stat-box.warning { background: #fef3c7; color: #78350f; }
     .stat-box.success { background: #dcfce7; color: #14532d; }
     .stat-number { font-size: 1.2rem; font-weight: bold; }
+
+    .risk-banner { padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; margin-bottom: 12px; text-align: center; }
+    .risk-low { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .risk-medium { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .risk-high { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
 
     table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
     th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
@@ -119,6 +124,9 @@
             <div class="stat-box success"><div>✅ Entregados</div><div class="stat-number" id="statSigned">0</div></div>
           </div>
 
+          <!-- Banner de Evaluación de Devolución basado solo en Anomalías -->
+          <div id="riskBanner" class="risk-banner" style="display: none;"></div>
+
           <div class="section-subtitle">📦 Registros Encontrados:</div>
           <div style="overflow-x: auto; max-height: 450px; overflow-y: auto;">
             <table>
@@ -136,8 +144,8 @@
           <div class="form-group">
             <label>Estado del Registro</label>
             <select id="status" onchange="toggleAnomalyMode()">
-              <option value="Resguardado">En Resguardo</option>
-              <option value="Anomalía">Anomalía (No recogido hoy)</option>
+              <option value="Resguardado">En Resguardo (Sin Devolución)</option>
+              <option value="Anomalía">Anomalía (No entregado el día 1)</option>
               <option value="Entregado">Entregado / Firmado</option>
             </select>
           </div>
@@ -147,7 +155,15 @@
           <div class="form-group"><label>Teléfono Alt. (Opcional)</label><input type="tel" id="altPhone"></div>
           <div class="form-group" id="descGroup"><label>Descripción (Opcional)</label><input type="text" id="description"></div>
           <div class="form-group" id="anomalyGroup" style="display: none;">
-            <label>Motivo de Anomalía</label><input type="text" id="anomalyNote" placeholder="Ej: No pasó a recoger">
+            <label>Motivo de Anomalía</label>
+            <select id="anomalyReasonSelect" onchange="checkCustomReason()" style="margin-bottom: 5px;">
+              <option value="No pasó a recoger el primer día">No pasó a recoger el primer día</option>
+              <option value="Prometió pasar mañana">Prometió pasar mañana</option>
+              <option value="Fuera de la ciudad">Fuera de la ciudad</option>
+              <option value="No contesta llamadas / WhatsApp">No contesta llamadas / WhatsApp</option>
+              <option value="OTRO">Otro motivo (Escribir abajo)</option>
+            </select>
+            <input type="text" id="anomalyNote" placeholder="Escribe el motivo..." style="display: none;">
           </div>
           <div class="form-group"><label>Foto de Evidencia (Galería o Cámara)</label><input type="file" id="evidencePhoto" accept="image/*"></div>
           <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="entryDate" required></div>
@@ -164,7 +180,7 @@
     </div>
 
     <div>
-      <!-- Control de Reincidencia de Clientes -->
+      <!-- Control de Reincidencia de Clientes (con Editar y Borrar incorporados) -->
       <div class="card" style="border-left: 4px solid var(--danger);">
         <h2>🚨 Análisis de Clientes Reincidentes (No recogen a tiempo)</h2>
         <div style="overflow-x: auto; max-height: 280px; overflow-y: auto;">
@@ -319,6 +335,18 @@
       document.getElementById('trackingNum').required = !isAnomaly;
     }
 
+    function checkCustomReason() {
+      const sel = document.getElementById('anomalyReasonSelect').value;
+      const customInput = document.getElementById('anomalyNote');
+      if (sel === 'OTRO') {
+        customInput.style.display = 'block';
+        customInput.required = true;
+      } else {
+        customInput.style.display = 'none';
+        customInput.required = false;
+      }
+    }
+
     function autoFillClientName() {
       const phone = document.getElementById('phone').value.trim();
       if (!phone) return;
@@ -376,6 +404,12 @@
       const tracking = document.getElementById('trackingNum').value.trim();
       const photoBase64 = await compressAndConvertImage(document.getElementById('evidencePhoto'));
 
+      let note = '';
+      if (status === 'Anomalía') {
+        const selReason = document.getElementById('anomalyReasonSelect').value;
+        note = selReason === 'OTRO' ? document.getElementById('anomalyNote').value.trim() : selReason;
+      }
+
       const newPackage = {
         id: Date.now(),
         tracking: tracking || 'S/N-' + Date.now().toString().slice(-4),
@@ -384,7 +418,7 @@
         altPhone: document.getElementById('altPhone').value.trim() || '',
         description: document.getElementById('description').value.trim() || '---',
         status: status,
-        anomalyNote: status === 'Anomalía' ? (document.getElementById('anomalyNote').value.trim() || 'No recogido') : '',
+        anomalyNote: note,
         anomalyDate: status === 'Anomalía' ? entryDate : null,
         entryDate: entryDate,
         signedDate: status === 'Entregado' ? entryDate : null,
@@ -518,7 +552,11 @@
       const deliveredCount = clientPkgs.filter(p => p.status === 'Entregado').length;
       const resguardoCount = clientPkgs.filter(p => p.status === 'Resguardado').length;
       const anomalyCount = clientPkgs.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
-      return { deliveredCount, resguardoCount, anomalyCount };
+      const totalPkgs = clientPkgs.length;
+      
+      const failureRate = totalPkgs > 0 ? Math.round((anomalyCount / totalPkgs) * 100) : 0;
+
+      return { deliveredCount, resguardoCount, anomalyCount, totalPkgs, failureRate };
     }
 
     function formatPhoneDisplay(pkg) {
@@ -533,7 +571,7 @@
       renderGeneralTable();
     }
 
-    // Render de Análisis de Reincidencia Integrado con Botones de Editar y Borrar
+    // Render de Análisis de Reincidencia Integrado
     function renderReincidenceTable() {
       const tbody = document.getElementById('reincidenceTableBody');
       tbody.innerHTML = '';
@@ -565,10 +603,10 @@
         const lastItem = sortedItems[0];
 
         const datesHtml = sortedItems
-          .map(item => `<span class="date-tag">${formatDate(item.anomalyDate || item.entryDate)}</span>`)
+          .map(item => `<span class="date-tag" title="${item.anomalyNote || ''}">${formatDate(item.anomalyDate || item.entryDate)}</span>`)
           .join('');
 
-        const { deliveredCount, anomalyCount } = getClientTotals(client.phone);
+        const { deliveredCount, anomalyCount, failureRate } = getClientTotals(client.phone);
 
         let avgText = '1ra vez';
         if (count > 1) {
@@ -586,7 +624,7 @@
             <td>
               <strong>${client.person}</strong><br>
               <small style="color:#64748b;">${client.phone}</small>
-              <span class="client-stats">✅ ${deliveredCount} entregados | 🚨 ${anomalyCount} no recogidos</span>
+              <span class="client-stats">✅ ${deliveredCount} ent. | 🚨 ${anomalyCount} no rec. (${failureRate}% reincidencia)</span>
             </td>
             <td><span class="badge-reincidencia ${badgeClass}">${count} vez(ces)</span></td>
             <td>${datesHtml}</td>
@@ -646,7 +684,13 @@
     function searchPackages() {
       const query = document.getElementById('searchInput').value.trim().toLowerCase();
       const resultsContainer = document.getElementById('searchResults');
-      if (!query) { resultsContainer.style.display = 'none'; return; }
+      const riskBanner = document.getElementById('riskBanner');
+
+      if (!query) { 
+        resultsContainer.style.display = 'none'; 
+        riskBanner.style.display = 'none';
+        return; 
+      }
 
       const filtered = packages.filter(p => 
         p.person.toLowerCase().includes(query) ||
@@ -661,10 +705,29 @@
       const totalAnomalies = filtered.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
       const totalPending = filtered.filter(p => p.status === 'Resguardado').length;
       const totalSigned = filtered.filter(p => p.status === 'Entregado').length;
+      const totalAll = filtered.length;
 
       document.getElementById('statAnomalies').textContent = totalAnomalies;
       document.getElementById('statPending').textContent = totalPending;
       document.getElementById('statSigned').textContent = totalSigned;
+
+      // Evaluación exclusiva basada en ANOMALÍAS (No día 1)
+      if (totalAll > 0) {
+        riskBanner.style.display = 'block';
+
+        if (totalAnomalies >= 4) {
+          riskBanner.className = 'risk-banner risk-high';
+          riskBanner.innerHTML = `🚨 <strong>ALTA REINCIDENCIA EN ANOMALÍAS</strong><br>Este cliente acumula ${totalAnomalies} no entregados el Día 1. Evaluar DEVOLUCIÓN A REMITENTE de este paquete. (Los paquetes en resguardo no se devuelven).`;
+        } else if (totalAnomalies >= 2) {
+          riskBanner.className = 'risk-banner risk-medium';
+          riskBanner.innerHTML = `⚠️ <strong>REINCIDENCIA MODERADA EN ANOMALÍAS</strong><br>Cliente con ${totalAnomalies} retrasos previos el Día 1. Solicitar compromiso de recepción.`;
+        } else {
+          riskBanner.className = 'risk-banner risk-low';
+          riskBanner.innerHTML = `🟢 <strong>CLIENTE REGULAR / CONFIABLE</strong><br>Sin reincidencia crítica de anomalías el primer día.`;
+        }
+      } else {
+        riskBanner.style.display = 'none';
+      }
 
       const body = document.getElementById('searchResultsBody');
       body.innerHTML = '';
