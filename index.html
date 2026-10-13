@@ -40,7 +40,7 @@
     
     .btn-action { padding: 5px 10px; font-size: 0.8rem; width: auto; background-color: var(--success); }
     .btn-edit { background-color: #0284c7; padding: 5px 10px; font-size: 0.8rem; width: auto; margin-right: 4px; }
-    .btn-delete { background-color: var(--danger); padding: 5px 10px; font-size: 0.8rem; width: auto; margin-left: 2px; }
+    .btn-delete { background-color: var(--danger); padding: 5px 10px; font-size: 0.8rem; width: auto; }
     .btn-delete:hover { background-color: #b91c1c; }
     .btn-photo { background-color: #8b5cf6; padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; display: inline-block; cursor: pointer; text-decoration: none; }
     .btn-restore { background-color: #0284c7; padding: 8px 12px; font-size: 0.85rem; }
@@ -68,6 +68,7 @@
     .badge-medium { background: #fef3c7; color: #92400e; }
     .badge-high { background: #fee2e2; color: #991b1b; }
 
+    .client-stats { font-size: 0.75rem; font-weight: bold; color: #475569; display: block; margin-top: 2px; }
     .date-tag { display: inline-block; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 5px; font-size: 0.7rem; margin: 1px; }
     .empty-message { text-align: center; color: #94a3b8; padding: 15px; }
     .section-subtitle { font-size: 0.95rem; font-weight: bold; margin-top: 15px; margin-bottom: 6px; color: #475569; border-left: 3px solid var(--primary); padding-left: 8px; }
@@ -163,10 +164,10 @@
     </div>
 
     <div>
-      <!-- Control de Reincidencia de Clientes -->
+      <!-- Control de Reincidencia de Clientes (con Editar y Borrar incorporados) -->
       <div class="card" style="border-left: 4px solid var(--danger);">
         <h2>🚨 Análisis de Clientes Reincidentes (No recogen a tiempo)</h2>
-        <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
+        <div style="overflow-x: auto; max-height: 280px; overflow-y: auto;">
           <table>
             <thead>
               <tr>
@@ -174,6 +175,7 @@
                 <th>Total Reincidencias</th>
                 <th>Historial de Fechas</th>
                 <th>Frecuencia Promedio</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="reincidenceTableBody"></tbody>
@@ -181,18 +183,7 @@
         </div>
       </div>
 
-      <!-- Control de Anomalías Activas -->
-      <div class="card">
-        <h2>🚨 Control de Anomalías Activas</h2>
-        <div style="overflow-x: auto;">
-          <table>
-            <thead><tr><th>Fecha Anomalía</th><th>Cliente / Teléfono</th><th>Guía</th><th>Motivo</th><th>Acción</th></tr></thead>
-            <tbody id="anomaliesTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Tabla Principal (Paquetes en Resguardo) -->
+      <!-- Tabla Principal (Paquetes activos en Resguardo) -->
       <div class="card">
         <h2>
           <span>📋 Paquetes Activos en Resguardo</span>
@@ -509,14 +500,10 @@
 
     function closeViewPhotoModal() { document.getElementById('viewPhotoModal').style.display = 'none'; }
 
-    function markAsResguardo(key) { db.ref('packages/' + key).update({ status: 'Resguardado' }); }
-
-    // Función para eliminar anomalía si fue registrada por error o si el cliente pasó después
-    function deleteAnomaly(key) {
-      if (confirm('⚠️ ¿Deseas eliminar este registro de anomalía? Esta acción lo borrará de la base de datos.')) {
-        db.ref('packages/' + key).remove((error) => {
-          if (error) alert('Error al eliminar el registro.');
-        });
+    function deleteAnomalyRecord(key, phone) {
+      const choice = confirm('⚠️ ¿Deseas ELIMINAR el último registro de anomalía de este cliente?\n\n- OPRIME "Aceptar" para borrar sólo la última anomalía.\n- O "Cancelar" para descartar.');
+      if (choice) {
+        db.ref('packages/' + key).remove();
       }
     }
 
@@ -525,18 +512,26 @@
       return new Date(dateStr).toLocaleString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
+    function getClientTotals(phone) {
+      const clientPkgs = packages.filter(p => p.phone === phone);
+      const deliveredCount = clientPkgs.filter(p => p.status === 'Entregado').length;
+      const anomalyCount = clientPkgs.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
+      return { deliveredCount, anomalyCount };
+    }
+
     function formatPhoneDisplay(pkg) {
+      const { deliveredCount, anomalyCount } = getClientTotals(pkg.phone);
       let html = `<small style="color:#64748b">${pkg.phone}</small>`;
       if (pkg.altPhone) html += `<br><small style="color:#2563eb; font-weight:bold;">Alt: ${pkg.altPhone}</small>`;
+      html += `<span class="client-stats">✅ ${deliveredCount} entregados | 🚨 ${anomalyCount} no recogidos</span>`;
       return html;
     }
 
     function renderTables() {
       renderGeneralTable();
-      renderAnomaliesTable();
     }
 
-    // Análisis de Reincidencia Integrado
+    // Render de Análisis de Reincidencia Integrado con Botones de Editar y Borrar
     function renderReincidenceTable() {
       const tbody = document.getElementById('reincidenceTableBody');
       tbody.innerHTML = '';
@@ -546,46 +541,61 @@
 
       anomalies.forEach(p => {
         if (!grouped[p.phone]) {
-          grouped[p.phone] = { phone: p.phone, person: p.person, dates: [] };
+          grouped[p.phone] = { phone: p.phone, person: p.person, items: [] };
         }
-        grouped[p.phone].dates.push(p.anomalyDate || p.entryDate);
+        grouped[p.phone].items.push(p);
       });
 
-      const clients = Object.values(grouped).sort((a, b) => b.dates.length - a.dates.length);
+      const clients = Object.values(grouped).sort((a, b) => b.items.length - a.items.length);
 
       if (clients.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="empty-message">No hay clientes con reincidencias de anomalías.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay clientes con reincidencias de anomalías.</td></tr>`;
         return;
       }
 
       clients.forEach(client => {
-        const count = client.dates.length;
+        const count = client.items.length;
         let badgeClass = 'badge-low';
         if (count >= 4) badgeClass = 'badge-high';
         else if (count >= 2) badgeClass = 'badge-medium';
 
-        const datesHtml = client.dates
-          .sort((a, b) => new Date(b) - new Date(a))
-          .map(d => `<span class="date-tag">${formatDate(d)}</span>`)
+        // Ordenar items de más reciente a más antiguo
+        const sortedItems = client.items.sort((a, b) => new Date(b.anomalyDate || b.entryDate) - new Date(a.anomalyDate || a.entryDate));
+        const lastItem = sortedItems[0];
+
+        const datesHtml = sortedItems
+          .map(item => `<span class="date-tag">${formatDate(item.anomalyDate || item.entryDate)}</span>`)
           .join('');
 
+        // Conteo de Historial Completo
+        const { deliveredCount, anomalyCount } = getClientTotals(client.phone);
+
+        // Frecuencia promedio
         let avgText = '1ra vez';
         if (count > 1) {
-          const sorted = client.dates.map(d => new Date(d)).sort((a, b) => a - b);
+          const sortedDates = sortedItems.map(d => new Date(d.anomalyDate || d.entryDate)).sort((a, b) => a - b);
           let totalDays = 0;
-          for (let i = 1; i < sorted.length; i++) {
-            totalDays += (sorted[i] - sorted[i - 1]) / (1000 * 60 * 60 * 24);
+          for (let i = 1; i < sortedDates.length; i++) {
+            totalDays += (sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60 * 24);
           }
-          const avg = Math.round(totalDays / (sorted.length - 1));
+          const avg = Math.round(totalDays / (sortedDates.length - 1));
           avgText = avg === 0 ? 'Mismo día' : `Cada ~${avg} días`;
         }
 
         tbody.innerHTML += `
           <tr>
-            <td><strong>${client.person}</strong><br><small style="color:#64748b;">${client.phone}</small></td>
+            <td>
+              <strong>${client.person}</strong><br>
+              <small style="color:#64748b;">${client.phone}</small>
+              <span class="client-stats">✅ ${deliveredCount} entregados | 🚨 ${anomalyCount} no recogidos</span>
+            </td>
             <td><span class="badge-reincidencia ${badgeClass}">${count} vez(ces)</span></td>
             <td>${datesHtml}</td>
             <td><small style="font-weight:bold; color:#ea580c;">${avgText}</small></td>
+            <td style="white-space: nowrap;">
+              <button class="btn-edit" onclick="openEditModal('${lastItem.firebaseKey}')">✏️ Editar</button>
+              <button class="btn-delete" onclick="deleteAnomalyRecord('${lastItem.firebaseKey}', '${client.phone}')">🗑️ Borrar</button>
+            </td>
           </tr>
         `;
       });
@@ -628,37 +638,6 @@
           <td style="white-space: nowrap;">
             <button class="btn-edit" onclick="openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
             <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">Firmar / Entregar</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function renderAnomaliesTable() {
-      const tbody = document.getElementById('anomaliesTableBody');
-      tbody.innerHTML = '';
-      const anomalies = packages.filter(p => p.status === 'Anomalía');
-
-      if (anomalies.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay anomalías registradas actualmente.</td></tr>`;
-        return;
-      }
-
-      anomalies.sort((a, b) => new Date(b.entryDate || b.id) - new Date(a.entryDate || a.id)).forEach(pkg => {
-        const tr = document.createElement('tr');
-        tr.id = `pkg-row-${pkg.firebaseKey}`;
-        if (isOlderThanOneWeek(pkg.entryDate)) tr.classList.add('over-week');
-
-        tr.innerHTML = `
-          <td>${formatDate(pkg.anomalyDate || pkg.entryDate)}</td>
-          <td><strong>${pkg.person}</strong><br>${formatPhoneDisplay(pkg)}</td>
-          <td><small>${pkg.tracking}</small></td>
-          <td><span style="color:#dc2626; font-weight:bold;">${pkg.anomalyNote || 'Sin motivo'}</span></td>
-          <td style="white-space: nowrap;">
-            <button class="btn-edit" onclick="openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
-            <button class="btn-action" style="background:#d97706; margin-bottom: 2px;" onclick="markAsResguardo('${pkg.firebaseKey}')">A Resguardo</button>
-            <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">Entregar</button>
-            <button class="btn-delete" onclick="deleteAnomaly('${pkg.firebaseKey}')">🗑️ Borrar</button>
           </td>
         `;
         tbody.appendChild(tr);
