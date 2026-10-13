@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control de Paquetes en la Nube</title>
+  <title>Control de Paquetes y Reincidencia en la Nube</title>
   <!-- Firebase JS SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -60,6 +60,13 @@
     .badge-resguardo { background: #fef3c7; color: #b45309; }
     .badge-entregado { background: #dcfce7; color: #15803d; }
     .badge-anomalia  { background: #fee2e2; color: #991b1b; }
+    
+    .badge-reincidencia { padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 0.75rem; display: inline-block; }
+    .badge-low { background: #dcfce7; color: #166534; }
+    .badge-medium { background: #fef3c7; color: #92400e; }
+    .badge-high { background: #fee2e2; color: #991b1b; }
+
+    .date-tag { display: inline-block; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 5px; font-size: 0.7rem; margin: 1px; }
     .empty-message { text-align: center; color: #94a3b8; padding: 15px; }
     .section-subtitle { font-size: 0.95rem; font-weight: bold; margin-top: 15px; margin-bottom: 6px; color: #475569; border-left: 3px solid var(--primary); padding-left: 8px; }
     
@@ -90,7 +97,7 @@
 </head>
 <body>
 
-  <h1>📦 Control de Paquetes y Resguardos</h1>
+  <h1>📦 Control de Paquetes y Reincidencias</h1>
   <div class="status-cloud">☁️ Sincronización en Tiempo Real Activa</div>
 
   <div class="grid-container">
@@ -119,25 +126,25 @@
         </div>
       </div>
 
-      <!-- Formulario -->
+      <!-- Formulario Unificado -->
       <div class="card">
         <h2>Registrar Paquete / Anomalía</h2>
         <form id="packageForm">
-          <div class="form-group"><label>Número de Guía</label><input type="text" id="trackingNum" required></div>
-          <div class="form-group"><label>Nombre de la persona</label><input type="text" id="personName" required></div>
-          <div class="form-group"><label>Teléfono (Original)</label><input type="tel" id="phone" required></div>
-          <div class="form-group"><label>Teléfono Alt. (Opcional)</label><input type="tel" id="altPhone"></div>
-          <div class="form-group"><label>Descripción (Opcional)</label><input type="text" id="description"></div>
           <div class="form-group">
-            <label>Estado del Paquete</label>
-            <select id="status" onchange="toggleAnomalyNote()">
+            <label>Estado del Registro</label>
+            <select id="status" onchange="toggleAnomalyMode()">
               <option value="Resguardado">En Resguardo</option>
-              <option value="Anomalía">Anomalía (No entregado hoy)</option>
+              <option value="Anomalía">Anomalía (No recogido hoy)</option>
               <option value="Entregado">Entregado / Firmado</option>
             </select>
           </div>
+          <div class="form-group"><label>Nombre de la persona</label><input type="text" id="personName" required placeholder="Ej: Yuliana Lopez"></div>
+          <div class="form-group"><label>Teléfono (Original)</label><input type="tel" id="phone" required placeholder="Ej: 6671234567" oninput="autoFillClientName()"></div>
+          <div class="form-group" id="trackingGroup"><label>Número de Guía</label><input type="text" id="trackingNum"></div>
+          <div class="form-group"><label>Teléfono Alt. (Opcional)</label><input type="tel" id="altPhone"></div>
+          <div class="form-group" id="descGroup"><label>Descripción (Opcional)</label><input type="text" id="description"></div>
           <div class="form-group" id="anomalyGroup" style="display: none;">
-            <label>Motivo de Anomalía</label><input type="text" id="anomalyNote">
+            <label>Motivo de Anomalía</label><input type="text" id="anomalyNote" placeholder="Ej: No pasó a recoger">
           </div>
           <div class="form-group"><label>Foto de Evidencia (Galería o Cámara)</label><input type="file" id="evidencePhoto" accept="image/*"></div>
           <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="entryDate" required></div>
@@ -154,9 +161,27 @@
     </div>
 
     <div>
-      <!-- Anomalías -->
+      <!-- Control de Reincidencia de Clientes (NUEVA INTEGRACIÓN) -->
+      <div class="card" style="border-left: 4px solid var(--danger);">
+        <h2>🚨 Análisis de Clientes Reincidentes (No recogen a tiempo)</h2>
+        <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente / Teléfono</th>
+                <th>Total Reincidencias</th>
+                <th>Historial de Fechas</th>
+                <th>Frecuencia Promedio</th>
+              </tr>
+            </thead>
+            <tbody id="reincidenceTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Control de Anomalías Activas -->
       <div class="card">
-        <h2>🚨 Control de Anomalías</h2>
+        <h2>🚨 Control de Anomalías Activas</h2>
         <div style="overflow-x: auto;">
           <table>
             <thead><tr><th>Fecha Anomalía</th><th>Cliente / Teléfono</th><th>Guía</th><th>Motivo</th><th>Acción</th></tr></thead>
@@ -165,7 +190,7 @@
         </div>
       </div>
 
-      <!-- Tabla Principal -->
+      <!-- Tabla Principal (Paquetes en Resguardo) -->
       <div class="card">
         <h2>
           <span>📋 Paquetes Activos en Resguardo</span>
@@ -275,6 +300,7 @@
           });
         }
         renderTables();
+        renderReincidenceTable();
         searchPackages();
         generateClientReport();
       });
@@ -293,9 +319,20 @@
       document.getElementById('reportEndDate').value = today.toISOString().slice(0, 10);
     }
 
-    function toggleAnomalyNote() {
+    function toggleAnomalyMode() {
       const status = document.getElementById('status').value;
-      document.getElementById('anomalyGroup').style.display = status === 'Anomalía' ? 'block' : 'none';
+      const isAnomaly = status === 'Anomalía';
+      document.getElementById('anomalyGroup').style.display = isAnomaly ? 'block' : 'none';
+      document.getElementById('trackingNum').required = !isAnomaly;
+    }
+
+    function autoFillClientName() {
+      const phone = document.getElementById('phone').value.trim();
+      if (!phone) return;
+      const match = packages.find(p => p.phone === phone);
+      if (match && match.person) {
+        document.getElementById('personName').value = match.person;
+      }
     }
 
     function calculateDaysInStorage(entryDateStr) {
@@ -343,17 +380,18 @@
       e.preventDefault();
       const entryDate = document.getElementById('entryDate').value;
       const status = document.getElementById('status').value;
+      const tracking = document.getElementById('trackingNum').value.trim();
       const photoBase64 = await compressAndConvertImage(document.getElementById('evidencePhoto'));
 
       const newPackage = {
         id: Date.now(),
-        tracking: document.getElementById('trackingNum').value.trim(),
+        tracking: tracking || 'S/N-' + Date.now().toString().slice(-4),
         person: document.getElementById('personName').value.trim(),
         phone: document.getElementById('phone').value.trim(),
         altPhone: document.getElementById('altPhone').value.trim() || '',
         description: document.getElementById('description').value.trim() || '---',
         status: status,
-        anomalyNote: status === 'Anomalía' ? document.getElementById('anomalyNote').value.trim() : '',
+        anomalyNote: status === 'Anomalía' ? (document.getElementById('anomalyNote').value.trim() || 'No recogido') : '',
         anomalyDate: status === 'Anomalía' ? entryDate : null,
         entryDate: entryDate,
         signedDate: status === 'Entregado' ? entryDate : null,
@@ -370,7 +408,7 @@
       document.getElementById('anomalyNote').value = '';
       document.getElementById('evidencePhoto').value = '';
       document.getElementById('status').value = 'Resguardado';
-      toggleAnomalyNote();
+      toggleAnomalyMode();
       setCurrentDate();
     });
 
@@ -485,6 +523,62 @@
     function renderTables() {
       renderGeneralTable();
       renderAnomaliesTable();
+    }
+
+    // Análisis de Reincidencia Integrado
+    function renderReincidenceTable() {
+      const tbody = document.getElementById('reincidenceTableBody');
+      tbody.innerHTML = '';
+
+      const anomalies = packages.filter(p => p.status === 'Anomalía' || p.anomalyDate);
+      const grouped = {};
+
+      anomalies.forEach(p => {
+        if (!grouped[p.phone]) {
+          grouped[p.phone] = { phone: p.phone, person: p.person, dates: [] };
+        }
+        grouped[p.phone].dates.push(p.anomalyDate || p.entryDate);
+      });
+
+      const clients = Object.values(grouped).sort((a, b) => b.dates.length - a.dates.length);
+
+      if (clients.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-message">No hay clientes con reincidencias de anomalías.</td></tr>`;
+        return;
+      }
+
+      clients.forEach(client => {
+        const count = client.dates.length;
+        let badgeClass = 'badge-low';
+        if (count >= 4) badgeClass = 'badge-high';
+        else if (count >= 2) badgeClass = 'badge-medium';
+
+        const datesHtml = client.dates
+          .sort((a, b) => new Date(b) - new Date(a))
+          .map(d => `<span class="date-tag">${formatDate(d)}</span>`)
+          .join('');
+
+        // Frecuencia promedio
+        let avgText = '1ra vez';
+        if (count > 1) {
+          const sorted = client.dates.map(d => new Date(d)).sort((a, b) => a - b);
+          let totalDays = 0;
+          for (let i = 1; i < sorted.length; i++) {
+            totalDays += (sorted[i] - sorted[i - 1]) / (1000 * 60 * 60 * 24);
+          }
+          const avg = Math.round(totalDays / (sorted.length - 1));
+          avgText = avg === 0 ? 'Mismo día' : `Cada ~${avg} días`;
+        }
+
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${client.person}</strong><br><small style="color:#64748b;">${client.phone}</small></td>
+            <td><span class="badge-reincidencia ${badgeClass}">${count} vez(ces)</span></td>
+            <td>${datesHtml}</td>
+            <td><small style="font-weight:bold; color:#ea580c;">${avgText}</small></td>
+          </tr>
+        `;
+      });
     }
 
     function renderGeneralTable() {
