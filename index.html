@@ -119,12 +119,12 @@
 
         <div id="searchResults" style="display: none;">
           <div class="stats-container">
-            <div class="stat-box danger"><div>🚨 Anomalías (No día 1)</div><div class="stat-number" id="statAnomalies">0</div></div>
-            <div class="stat-box warning"><div>📦 En Resguardo</div><div class="stat-number" id="statPending">0</div></div>
+            <div class="stat-box danger"><div>🚨 Anomalías</div><div class="stat-number" id="statAnomalies">0</div></div>
+            <div class="stat-box warning"><div>📦 Resguardos</div><div class="stat-number" id="statPending">0</div></div>
             <div class="stat-box success"><div>✅ Entregados</div><div class="stat-number" id="statSigned">0</div></div>
           </div>
 
-          <!-- Banner de Evaluación de Devolución basado solo en Anomalías -->
+          <!-- Banner de Regla de Servicio (Denegación/Devolución) -->
           <div id="riskBanner" class="risk-banner" style="display: none;"></div>
 
           <div class="section-subtitle">📦 Registros Encontrados:</div>
@@ -144,8 +144,8 @@
           <div class="form-group">
             <label>Estado del Registro</label>
             <select id="status" onchange="toggleAnomalyMode()">
-              <option value="Resguardado">En Resguardo (Sin Devolución)</option>
-              <option value="Anomalía">Anomalía (No entregado el día 1)</option>
+              <option value="Resguardado">En Resguardo (Pide guardar en bodega)</option>
+              <option value="Anomalía">Anomalía (No entregado / No vino Día 1)</option>
               <option value="Entregado">Entregado / Firmado</option>
             </select>
           </div>
@@ -180,17 +180,17 @@
     </div>
 
     <div>
-      <!-- Control de Reincidencia de Clientes (con Editar y Borrar incorporados) -->
+      <!-- Control de Reincidencia Dual (Resguardos vs Anomalías) -->
       <div class="card" style="border-left: 4px solid var(--danger);">
-        <h2>🚨 Análisis de Clientes Reincidentes (No recogen a tiempo)</h2>
-        <div style="overflow-x: auto; max-height: 280px; overflow-y: auto;">
+        <h2>🚨 Análisis de Reincidencias (Resguardos Frecuentes y Anomalías)</h2>
+        <div style="overflow-x: auto; max-height: 290px; overflow-y: auto;">
           <table>
             <thead>
               <tr>
                 <th>Cliente / Teléfono</th>
-                <th>Total Reincidencias</th>
-                <th>Historial de Fechas</th>
-                <th>Frecuencia Promedio</th>
+                <th>🚨 Anomalías</th>
+                <th>📦 Resguardos</th>
+                <th>Estado de Cliente</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -534,8 +534,8 @@
 
     function closeViewPhotoModal() { document.getElementById('viewPhotoModal').style.display = 'none'; }
 
-    function deleteAnomalyRecord(key) {
-      if (confirm('⚠️ ¿Deseas eliminar este registro de anomalía? Esta acción lo borrará de la base de datos.')) {
+    function deleteRecord(key) {
+      if (confirm('⚠️ ¿Deseas eliminar este registro de la base de datos?')) {
         db.ref('packages/' + key).remove((error) => {
           if (error) alert('Error al eliminar el registro.');
         });
@@ -553,17 +553,15 @@
       const resguardoCount = clientPkgs.filter(p => p.status === 'Resguardado').length;
       const anomalyCount = clientPkgs.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
       const totalPkgs = clientPkgs.length;
-      
-      const failureRate = totalPkgs > 0 ? Math.round((anomalyCount / totalPkgs) * 100) : 0;
 
-      return { deliveredCount, resguardoCount, anomalyCount, totalPkgs, failureRate };
+      return { deliveredCount, resguardoCount, anomalyCount, totalPkgs };
     }
 
     function formatPhoneDisplay(pkg) {
-      const { deliveredCount, anomalyCount } = getClientTotals(pkg.phone);
+      const { deliveredCount, resguardoCount, anomalyCount } = getClientTotals(pkg.phone);
       let html = `<small style="color:#64748b">${pkg.phone}</small>`;
       if (pkg.altPhone) html += `<br><small style="color:#2563eb; font-weight:bold;">Alt: ${pkg.altPhone}</small>`;
-      html += `<span class="client-stats">✅ ${deliveredCount} entregados | 🚨 ${anomalyCount} no recogidos</span>`;
+      html += `<span class="client-stats">✅ ${deliveredCount} ent. | 📦 ${resguardoCount} resg. | 🚨 ${anomalyCount} anom.</span>`;
       return html;
     }
 
@@ -571,52 +569,51 @@
       renderGeneralTable();
     }
 
-    // Render de Análisis de Reincidencia Integrado
+    // Render de Tabla de Reincidencia Dual (Separa Anomalías y Resguardos)
     function renderReincidenceTable() {
       const tbody = document.getElementById('reincidenceTableBody');
       tbody.innerHTML = '';
 
-      const anomalies = packages.filter(p => p.status === 'Anomalía' || p.anomalyDate);
       const grouped = {};
 
-      anomalies.forEach(p => {
+      packages.forEach(p => {
         if (!grouped[p.phone]) {
           grouped[p.phone] = { phone: p.phone, person: p.person, items: [] };
         }
         grouped[p.phone].items.push(p);
       });
 
-      const clients = Object.values(grouped).sort((a, b) => b.items.length - a.items.length);
+      // Filtrar clientes que tengan al menos 1 resguardo o 1 anomalía
+      const clients = Object.values(grouped).filter(c => {
+        const totals = getClientTotals(c.phone);
+        return totals.resguardoCount > 0 || totals.anomalyCount > 0;
+      });
+
+      // Ordenar por impacto: Quienes sumen más anomalías + resguardos arriba
+      clients.sort((a, b) => {
+        const tA = getClientTotals(a.phone);
+        const tB = getClientTotals(b.phone);
+        return (tB.anomalyCount * 2 + tB.resguardoCount) - (tA.anomalyCount * 2 + tA.resguardoCount);
+      });
 
       if (clients.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay clientes con reincidencias de anomalías.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay registros de resguardos ni anomalías acumuladas.</td></tr>`;
         return;
       }
 
       clients.forEach(client => {
-        const count = client.items.length;
+        const { deliveredCount, resguardoCount, anomalyCount } = getClientTotals(client.phone);
+        const lastItem = client.items[client.items.length - 1];
+
         let badgeClass = 'badge-low';
-        if (count >= 4) badgeClass = 'badge-high';
-        else if (count >= 2) badgeClass = 'badge-medium';
+        let statusText = '🟢 Regular';
 
-        const sortedItems = client.items.sort((a, b) => new Date(b.anomalyDate || b.entryDate) - new Date(a.anomalyDate || a.entryDate));
-        const lastItem = sortedItems[0];
-
-        const datesHtml = sortedItems
-          .map(item => `<span class="date-tag" title="${item.anomalyNote || ''}">${formatDate(item.anomalyDate || item.entryDate)}</span>`)
-          .join('');
-
-        const { deliveredCount, anomalyCount, failureRate } = getClientTotals(client.phone);
-
-        let avgText = '1ra vez';
-        if (count > 1) {
-          const sortedDates = sortedItems.map(d => new Date(d.anomalyDate || d.entryDate)).sort((a, b) => a - b);
-          let totalDays = 0;
-          for (let i = 1; i < sortedDates.length; i++) {
-            totalDays += (sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60 * 24);
-          }
-          const avg = Math.round(totalDays / (sortedDates.length - 1));
-          avgText = avg === 0 ? 'Mismo día' : `Cada ~${avg} días`;
+        if (anomalyCount >= 3) {
+          badgeClass = 'badge-high';
+          statusText = '🚨 Reincidente Crítico (Devolver)';
+        } else if (resguardoCount >= 4 || (anomalyCount + resguardoCount) >= 4) {
+          badgeClass = 'badge-medium';
+          statusText = '🟡 Exceso de Resguardos (Denegar)';
         }
 
         tbody.innerHTML += `
@@ -624,14 +621,13 @@
             <td>
               <strong>${client.person}</strong><br>
               <small style="color:#64748b;">${client.phone}</small>
-              <span class="client-stats">✅ ${deliveredCount} ent. | 🚨 ${anomalyCount} no rec. (${failureRate}% reincidencia)</span>
             </td>
-            <td><span class="badge-reincidencia ${badgeClass}">${count} vez(ces)</span></td>
-            <td>${datesHtml}</td>
-            <td><small style="font-weight:bold; color:#ea580c;">${avgText}</small></td>
+            <td><strong style="color:#dc2626;">${anomalyCount} vez(ces)</strong></td>
+            <td><strong style="color:#b45309;">${resguardoCount} paquete(s)</strong></td>
+            <td><span class="badge-reincidencia ${badgeClass}">${statusText}</span></td>
             <td style="white-space: nowrap;">
               <button class="btn-edit" onclick="openEditModal('${lastItem.firebaseKey}')">✏️ Editar</button>
-              <button class="btn-delete" onclick="deleteAnomalyRecord('${lastItem.firebaseKey}')">🗑️ Borrar</button>
+              <button class="btn-delete" onclick="deleteRecord('${lastItem.firebaseKey}')">🗑️ Borrar</button>
             </td>
           </tr>
         `;
@@ -705,25 +701,24 @@
       const totalAnomalies = filtered.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
       const totalPending = filtered.filter(p => p.status === 'Resguardado').length;
       const totalSigned = filtered.filter(p => p.status === 'Entregado').length;
-      const totalAll = filtered.length;
 
       document.getElementById('statAnomalies').textContent = totalAnomalies;
       document.getElementById('statPending').textContent = totalPending;
       document.getElementById('statSigned').textContent = totalSigned;
 
-      // Evaluación exclusiva basada en ANOMALÍAS (No día 1)
-      if (totalAll > 0) {
+      // Alerta según tipo de Incumplimiento
+      if (filtered.length > 0) {
         riskBanner.style.display = 'block';
 
-        if (totalAnomalies >= 4) {
+        if (totalAnomalies >= 3) {
           riskBanner.className = 'risk-banner risk-high';
-          riskBanner.innerHTML = `🚨 <strong>ALTA REINCIDENCIA EN ANOMALÍAS</strong><br>Este cliente acumula ${totalAnomalies} no entregados el Día 1. Evaluar DEVOLUCIÓN A REMITENTE de este paquete. (Los paquetes en resguardo no se devuelven).`;
-        } else if (totalAnomalies >= 2) {
+          riskBanner.innerHTML = `🚨 <strong>CLIENTE CRÍTICO EN ANOMALÍAS (${totalAnomalies} fallos)</strong><br>DENEGAR NUEVO SERVICIO / DEVOLVER PAQUETE A REMITENTE SI NO RECIBE DÍA 1.`;
+        } else if (totalPending >= 4 || (totalAnomalies + totalPending) >= 4) {
           riskBanner.className = 'risk-banner risk-medium';
-          riskBanner.innerHTML = `⚠️ <strong>REINCIDENCIA MODERADA EN ANOMALÍAS</strong><br>Cliente con ${totalAnomalies} retrasos previos el Día 1. Solicitar compromiso de recepción.`;
+          riskBanner.innerHTML = `⚠️ <strong>EXCESO DE RESGUARDOS ACUMULADOS (${totalPending} paquetes)</strong><br>Cliente abusa de la opción de resguardo. Notificar que no se aceptarán más resguardos indefinidos.`;
         } else {
           riskBanner.className = 'risk-banner risk-low';
-          riskBanner.innerHTML = `🟢 <strong>CLIENTE REGULAR / CONFIABLE</strong><br>Sin reincidencia crítica de anomalías el primer día.`;
+          riskBanner.innerHTML = `🟢 <strong>CLIENTE DENTRO DE LÍMITES PERMITIDOS</strong><br>Cuenta con historial aceptable de entregas.`;
         }
       } else {
         riskBanner.style.display = 'none';
