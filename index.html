@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control de Paquetes y Reincidencia en la Nube</title>
+  <title>Control de Paquetes y Reincidencias</title>
   <!-- Firebase JS SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -40,6 +40,8 @@
     
     .btn-action { padding: 5px 10px; font-size: 0.8rem; width: auto; background-color: var(--success); }
     .btn-edit { background-color: #0284c7; padding: 5px 10px; font-size: 0.8rem; width: auto; margin-right: 4px; }
+    .btn-delete { background-color: var(--danger); padding: 5px 10px; font-size: 0.8rem; width: auto; margin-left: 2px; }
+    .btn-delete:hover { background-color: #b91c1c; }
     .btn-photo { background-color: #8b5cf6; padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; display: inline-block; cursor: pointer; text-decoration: none; }
     .btn-restore { background-color: #0284c7; padding: 8px 12px; font-size: 0.85rem; }
 
@@ -161,7 +163,7 @@
     </div>
 
     <div>
-      <!-- Control de Reincidencia de Clientes (NUEVA INTEGRACIÓN) -->
+      <!-- Control de Reincidencia de Clientes -->
       <div class="card" style="border-left: 4px solid var(--danger);">
         <h2>🚨 Análisis de Clientes Reincidentes (No recogen a tiempo)</h2>
         <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
@@ -509,6 +511,15 @@
 
     function markAsResguardo(key) { db.ref('packages/' + key).update({ status: 'Resguardado' }); }
 
+    // Función para eliminar anomalía si fue registrada por error o si el cliente pasó después
+    function deleteAnomaly(key) {
+      if (confirm('⚠️ ¿Deseas eliminar este registro de anomalía? Esta acción lo borrará de la base de datos.')) {
+        db.ref('packages/' + key).remove((error) => {
+          if (error) alert('Error al eliminar el registro.');
+        });
+      }
+    }
+
     function formatDate(dateStr) {
       if (!dateStr) return '---';
       return new Date(dateStr).toLocaleString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -558,7 +569,6 @@
           .map(d => `<span class="date-tag">${formatDate(d)}</span>`)
           .join('');
 
-        // Frecuencia promedio
         let avgText = '1ra vez';
         if (count > 1) {
           const sorted = client.dates.map(d => new Date(d)).sort((a, b) => a - b);
@@ -648,6 +658,7 @@
             <button class="btn-edit" onclick="openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
             <button class="btn-action" style="background:#d97706; margin-bottom: 2px;" onclick="markAsResguardo('${pkg.firebaseKey}')">A Resguardo</button>
             <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">Entregar</button>
+            <button class="btn-delete" onclick="deleteAnomaly('${pkg.firebaseKey}')">🗑️ Borrar</button>
           </td>
         `;
         tbody.appendChild(tr);
