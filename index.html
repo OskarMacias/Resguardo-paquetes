@@ -43,6 +43,7 @@
     .btn-delete { background-color: var(--danger); padding: 5px 10px; font-size: 0.8rem; width: auto; }
     .btn-delete:hover { background-color: #b91c1c; }
     .btn-photo { background-color: #8b5cf6; padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; display: inline-block; cursor: pointer; text-decoration: none; }
+    .btn-upload-photo { background-color: #0284c7; padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; cursor: pointer; }
     .btn-restore { background-color: #0284c7; padding: 8px 12px; font-size: 0.85rem; }
 
     .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
@@ -108,7 +109,12 @@
     .report-filters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
     @media (max-width: 600px) { .report-filters { grid-template-columns: 1fr; } }
 
-    .preview-img { max-width: 100%; max-height: 300px; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border); display: block; }
+    /* Imagen con cursor zoom */
+    .preview-img { max-width: 100%; max-height: 350px; border-radius: 8px; margin: 10px auto; border: 1px solid var(--border); display: block; cursor: zoom-in; transition: transform 0.2s ease; }
+
+    /* Lightbox para Zoom Completo */
+    .lightbox-modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; cursor: zoom-out; }
+    .lightbox-modal img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 6px; }
   </style>
 </head>
 <body>
@@ -132,7 +138,7 @@
             <div class="stat-box success"><div>✅ Entregados</div><div class="stat-number" id="statSigned">0</div></div>
           </div>
 
-          <!-- Banner de Regla de Servicio (Denegación/Devolución) -->
+          <!-- Banner de Regla de Servicio -->
           <div id="riskBanner" class="risk-banner" style="display: none;"></div>
 
           <div class="section-subtitle">📦 Registros Encontrados:</div>
@@ -288,28 +294,34 @@
     </div>
   </div>
 
-  <!-- Modal para Adjuntar Foto al Entregar -->
+  <!-- Modal para Adjuntar Foto al Entregar o Actualizar Entregado -->
   <div id="deliverModal" class="modal">
     <div class="modal-content">
-      <div class="modal-header">✍️ Firmar y Adjuntar Evidencia de Entrega</div>
+      <div class="modal-header" id="deliverModalTitle">✍️ Firmar y Adjuntar Evidencia de Entrega</div>
       <input type="hidden" id="deliverKey">
       <div class="form-group"><label>Foto / Captura de Evidencia (Galería o Cámara)</label><input type="file" id="deliverPhotoInput" accept="image/*"></div>
       <div class="modal-actions">
-        <button type="button" onclick="confirmDeliveryWithPhoto()">Confirmar Entrega</button>
+        <button type="button" onclick="confirmDeliveryWithPhoto()">Guardar Foto</button>
         <button type="button" class="btn-cancel" onclick="closeDeliverModal()">Cancelar</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal para Ver Foto -->
+  <!-- Modal para Ver Foto con botón de Zoom -->
   <div id="viewPhotoModal" class="modal">
     <div class="modal-content" style="text-align: center;">
       <div class="modal-header">📷 Evidencia de Entrega / Resguardo</div>
-      <img id="modalPreviewImage" class="preview-img" src="" alt="Evidencia">
+      <p style="font-size:0.75rem; color:#64748b; margin-bottom:5px;">💡 Haz clic o toca la imagen para verla en pantalla completa / hacer zoom</p>
+      <img id="modalPreviewImage" class="preview-img" src="" alt="Evidencia" onclick="openLightbox(this.src)">
       <div class="modal-actions" style="margin-top: 15px;">
         <button type="button" class="btn-cancel" onclick="closeViewPhotoModal()">Cerrar</button>
       </div>
     </div>
+  </div>
+
+  <!-- Lightbox Pantalla Completa -->
+  <div id="lightboxModal" class="lightbox-modal" onclick="closeLightbox()">
+    <img id="lightboxImage" src="" alt="Zoom Evidencia">
   </div>
 
   <script>
@@ -390,7 +402,6 @@
       }
     }
 
-    // Lógica de Autocompletado en Tiempo Real
     function handleAutoComplete(type) {
       const uniqueClients = [];
       const map = new Map();
@@ -596,9 +607,10 @@
       });
     }
 
-    function markAsDelivered(key) {
+    function markAsDelivered(key, isDeliveredUpdate = false) {
       document.getElementById('deliverKey').value = key;
       document.getElementById('deliverPhotoInput').value = '';
+      document.getElementById('deliverModalTitle').textContent = isDeliveredUpdate ? "📷 Adjuntar / Actualizar Foto de Evidencia" : "✍️ Firmar y Adjuntar Evidencia de Entrega";
       document.getElementById('deliverModal').style.display = 'flex';
     }
 
@@ -609,13 +621,16 @@
       if (!key) return;
 
       const photoBase64 = await compressAndConvertImage(document.getElementById('deliverPhotoInput'));
-      const now = new Date();
-      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      const pkg = packages.find(p => p.firebaseKey === key);
 
-      const updatePayload = {
-        status: 'Entregado',
-        signedDate: now.toISOString().slice(0, 16)
-      };
+      const updatePayload = {};
+
+      if (pkg && pkg.status !== 'Entregado') {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        updatePayload.status = 'Entregado';
+        updatePayload.signedDate = now.toISOString().slice(0, 16);
+      }
 
       if (photoBase64) {
         updatePayload.evidencePhoto = photoBase64;
@@ -634,6 +649,16 @@
 
     function closeViewPhotoModal() { document.getElementById('viewPhotoModal').style.display = 'none'; }
 
+    // Funciones para Zoom / Pantalla Completa
+    function openLightbox(imgSrc) {
+      document.getElementById('lightboxImage').src = imgSrc;
+      document.getElementById('lightboxModal').style.display = 'flex';
+    }
+
+    function closeLightbox() {
+      document.getElementById('lightboxModal').style.display = 'none';
+    }
+
     function deleteRecord(key) {
       if (confirm('⚠️ ¿Deseas eliminar este registro de la base de datos?')) {
         db.ref('packages/' + key).remove((error) => {
@@ -647,13 +672,11 @@
       return new Date(dateStr).toLocaleString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
-    // Nueva Lógica de Conteo: Varios paquetes resguardados el MISMO DÍA cuentan como 1 SOLO resguardo
     function getClientTotals(phone) {
       const clientPkgs = packages.filter(p => p.phone === phone);
       const deliveredCount = clientPkgs.filter(p => p.status === 'Entregado').length;
       const anomalyCount = clientPkgs.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
 
-      // Agrupar resguardos por fecha YYYY-MM-DD
       const resguardoDates = new Set();
       clientPkgs.forEach(p => {
         if (p.status === 'Resguardado' && p.entryDate) {
@@ -662,7 +685,7 @@
         }
       });
 
-      const resguardoCount = resguardoDates.size; // Total de DÍAS de resguardo
+      const resguardoCount = resguardoDates.size;
       const totalPkgs = clientPkgs.length;
 
       return { deliveredCount, resguardoCount, anomalyCount, totalPkgs };
@@ -680,7 +703,6 @@
       renderGeneralTable();
     }
 
-    // Render de Tabla de Reincidencia Dual
     function renderReincidenceTable() {
       const tbody = document.getElementById('reincidenceTableBody');
       tbody.innerHTML = '';
@@ -880,7 +902,7 @@
         void targetRow.offsetWidth;
         targetRow.classList.add('highlight-row');
       } else {
-        alert('Este paquete fue entregado o se encuentra registrado en el historial de reportes.');
+        alert('Este paquete fue delivered o se encuentra registrado en el historial de reportes.');
       }
     }
 
@@ -918,7 +940,9 @@
       }
 
       clientDeliveredPackages.forEach(pkg => {
-        let photoBtnHtml = pkg.evidencePhoto ? `<button class="btn-photo" onclick="showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button>` : 'Sin foto';
+        let photoBtnHtml = pkg.evidencePhoto 
+          ? `<button class="btn-photo" onclick="showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button> <button class="btn-upload-photo" onclick="markAsDelivered('${pkg.firebaseKey}', true)">✏️ Cambiar Foto</button>` 
+          : `<button class="btn-upload-photo" onclick="markAsDelivered('${pkg.firebaseKey}', true)">📷 Subir Foto</button>`;
 
         tbody.innerHTML += `
           <tr>
