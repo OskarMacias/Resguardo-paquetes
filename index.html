@@ -31,7 +31,7 @@
     .card { background: var(--card-bg); border-radius: 10px; padding: 18px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid var(--border); margin-bottom: 20px; }
     .card h2 { font-size: 1.15rem; margin-bottom: 14px; color: #334155; border-bottom: 2px solid var(--bg); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
     
-    .form-group { margin-bottom: 12px; }
+    .form-group { margin-bottom: 12px; position: relative; }
     label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.85rem; }
     input, select { width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; outline: none; }
     
@@ -67,6 +67,7 @@
     .badge-resguardo { background: #fef3c7; color: #b45309; }
     .badge-entregado { background: #dcfce7; color: #15803d; }
     .badge-anomalia  { background: #fee2e2; color: #991b1b; }
+    .badge-indefinido { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 4px; }
     
     .badge-reincidencia { padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 0.75rem; display: inline-block; }
     .badge-low { background: #dcfce7; color: #166534; }
@@ -74,11 +75,18 @@
     .badge-high { background: #fee2e2; color: #991b1b; }
 
     .client-stats { font-size: 0.75rem; font-weight: bold; color: #475569; display: block; margin-top: 2px; }
-    .date-tag { display: inline-block; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 5px; font-size: 0.7rem; margin: 1px; }
     .empty-message { text-align: center; color: #94a3b8; padding: 15px; }
     .section-subtitle { font-size: 0.95rem; font-weight: bold; margin-top: 15px; margin-bottom: 6px; color: #475569; border-left: 3px solid var(--primary); padding-left: 8px; }
     
     .pkg-number { display: inline-block; background: #e2e8f0; color: #334155; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-right: 5px; }
+
+    /* Desplegable de Sugerencias de Autocompletado */
+    .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--border); border-radius: 0 0 6px 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 150px; overflow-y: auto; z-index: 99; display: none; }
+    .autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; }
+    .autocomplete-item:hover { background-color: #f8fafc; color: var(--primary); font-weight: bold; }
+
+    .checkbox-container { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px; font-size: 0.85rem; font-weight: bold; color: #1e3a8a; }
+    .checkbox-container input { width: auto; cursor: pointer; }
 
     .highlight-row { animation: highlightAnim 2.5s ease-out; }
     @keyframes highlightAnim {
@@ -140,7 +148,7 @@
       <!-- Formulario Unificado -->
       <div class="card">
         <h2>Registrar Paquete / Anomalía</h2>
-        <form id="packageForm">
+        <form id="packageForm" autocomplete="off">
           <div class="form-group">
             <label>Estado del Registro</label>
             <select id="status" onchange="toggleAnomalyMode()">
@@ -149,11 +157,32 @@
               <option value="Entregado">Entregado / Firmado</option>
             </select>
           </div>
-          <div class="form-group"><label>Nombre de la persona</label><input type="text" id="personName" required placeholder="Ej: Yuliana Lopez"></div>
-          <div class="form-group"><label>Teléfono (Original)</label><input type="tel" id="phone" required placeholder="Ej: 6671234567" oninput="autoFillClientName()"></div>
+
+          <!-- Campo Teléfono con Autocompletado -->
+          <div class="form-group">
+            <label>Teléfono (Original)</label>
+            <input type="tel" id="phone" required placeholder="Ej: 6671234567" oninput="handleAutoComplete('phone')">
+            <div id="phoneSuggestions" class="autocomplete-list"></div>
+          </div>
+
+          <!-- Campo Nombre con Autocompletado -->
+          <div class="form-group">
+            <label>Nombre de la persona</label>
+            <input type="text" id="personName" required placeholder="Ej: Yuliana Lopez" oninput="handleAutoComplete('name')">
+            <div id="nameSuggestions" class="autocomplete-list"></div>
+          </div>
+
           <div class="form-group" id="trackingGroup"><label>Número de Guía</label><input type="text" id="trackingNum"></div>
           <div class="form-group"><label>Teléfono Alt. (Opcional)</label><input type="tel" id="altPhone"></div>
           <div class="form-group" id="descGroup"><label>Descripción (Opcional)</label><input type="text" id="description"></div>
+
+          <!-- Opción de Resguardo Indefinido -->
+          <div class="form-group" id="indefiniteResguardoGroup">
+            <label class="checkbox-container">
+              <input type="checkbox" id="isIndefinite"> ♾️ Resguardo Indefinido (Sin fecha límite)
+            </label>
+          </div>
+
           <div class="form-group" id="anomalyGroup" style="display: none;">
             <label>Motivo de Anomalía</label>
             <select id="anomalyReasonSelect" onchange="checkCustomReason()" style="margin-bottom: 5px;">
@@ -165,6 +194,7 @@
             </select>
             <input type="text" id="anomalyNote" placeholder="Escribe el motivo..." style="display: none;">
           </div>
+
           <div class="form-group"><label>Foto de Evidencia (Galería o Cámara)</label><input type="file" id="evidencePhoto" accept="image/*"></div>
           <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="entryDate" required></div>
           <button type="submit">Guardar Registro</button>
@@ -182,14 +212,14 @@
     <div>
       <!-- Control de Reincidencia Dual (Resguardos vs Anomalías) -->
       <div class="card" style="border-left: 4px solid var(--danger);">
-        <h2>🚨 Análisis de Reincidencias (Resguardos Frecuentes y Anomalías)</h2>
+        <h2>🚨 Análisis de Reincidencias (Días de Resguardo y Anomalías)</h2>
         <div style="overflow-x: auto; max-height: 290px; overflow-y: auto;">
           <table>
             <thead>
               <tr>
                 <th>Cliente / Teléfono</th>
                 <th>🚨 Anomalías</th>
-                <th>📦 Resguardos</th>
+                <th>📦 Días de Resguardo</th>
                 <th>Estado de Cliente</th>
                 <th>Acciones</th>
               </tr>
@@ -245,6 +275,11 @@
       <div class="form-group"><label>Teléfono Original</label><input type="tel" id="editPhone"></div>
       <div class="form-group"><label>Teléfono Alternativo</label><input type="tel" id="editAltPhone"></div>
       <div class="form-group"><label>Descripción</label><input type="text" id="editDescription"></div>
+      <div class="form-group">
+        <label class="checkbox-container">
+          <input type="checkbox" id="editIsIndefinite"> ♾️ Resguardo Indefinido
+        </label>
+      </div>
       <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="editEntryDate"></div>
       <div class="modal-actions">
         <button type="button" onclick="savePackageEdit()">Guardar Cambios</button>
@@ -297,6 +332,13 @@
       setCurrentDate();
       setDefaultReportDates();
       listenToFirebase();
+
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.form-group')) {
+          document.getElementById('phoneSuggestions').style.display = 'none';
+          document.getElementById('nameSuggestions').style.display = 'none';
+        }
+      });
     });
 
     function listenToFirebase() {
@@ -333,6 +375,7 @@
       const isAnomaly = status === 'Anomalía';
       document.getElementById('anomalyGroup').style.display = isAnomaly ? 'block' : 'none';
       document.getElementById('trackingNum').required = !isAnomaly;
+      document.getElementById('indefiniteResguardoGroup').style.display = status === 'Resguardado' ? 'block' : 'none';
     }
 
     function checkCustomReason() {
@@ -347,16 +390,69 @@
       }
     }
 
-    function autoFillClientName() {
-      const phone = document.getElementById('phone').value.trim();
-      if (!phone) return;
-      const match = packages.find(p => p.phone === phone);
-      if (match && match.person) {
-        document.getElementById('personName').value = match.person;
+    // Lógica de Autocompletado en Tiempo Real
+    function handleAutoComplete(type) {
+      const uniqueClients = [];
+      const map = new Map();
+
+      packages.forEach(p => {
+        if (p.phone && p.person && !map.has(p.phone)) {
+          map.set(p.phone, p.person);
+          uniqueClients.push({ phone: p.phone, person: p.person, altPhone: p.altPhone || '' });
+        }
+      });
+
+      if (type === 'phone') {
+        const query = document.getElementById('phone').value.trim().toLowerCase();
+        const list = document.getElementById('phoneSuggestions');
+        list.innerHTML = '';
+        if (!query) { list.style.display = 'none'; return; }
+
+        const matches = uniqueClients.filter(c => c.phone.toLowerCase().includes(query));
+        if (matches.length > 0) {
+          list.style.display = 'block';
+          matches.forEach(m => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.innerHTML = `<strong>${m.phone}</strong> - ${m.person}`;
+            item.onclick = () => selectClient(m);
+            list.appendChild(item);
+          });
+        } else {
+          list.style.display = 'none';
+        }
+      } else if (type === 'name') {
+        const query = document.getElementById('personName').value.trim().toLowerCase();
+        const list = document.getElementById('nameSuggestions');
+        list.innerHTML = '';
+        if (!query) { list.style.display = 'none'; return; }
+
+        const matches = uniqueClients.filter(c => c.person.toLowerCase().includes(query));
+        if (matches.length > 0) {
+          list.style.display = 'block';
+          matches.forEach(m => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.innerHTML = `<strong>${m.person}</strong> - ${m.phone}`;
+            item.onclick = () => selectClient(m);
+            list.appendChild(item);
+          });
+        } else {
+          list.style.display = 'none';
+        }
       }
     }
 
-    function calculateDaysInStorage(entryDateStr) {
+    function selectClient(client) {
+      document.getElementById('phone').value = client.phone;
+      document.getElementById('personName').value = client.person;
+      if (client.altPhone) document.getElementById('altPhone').value = client.altPhone;
+      document.getElementById('phoneSuggestions').style.display = 'none';
+      document.getElementById('nameSuggestions').style.display = 'none';
+    }
+
+    function calculateDaysInStorage(entryDateStr, isIndefinite) {
+      if (isIndefinite) return '♾️ Indefinido';
       if (!entryDateStr) return '---';
       const entry = new Date(entryDateStr);
       const now = new Date();
@@ -367,8 +463,8 @@
       return `${diffDays} días`;
     }
 
-    function isOlderThanOneWeek(entryDateStr) {
-      if (!entryDateStr) return false;
+    function isOlderThanOneWeek(entryDateStr, isIndefinite) {
+      if (isIndefinite || !entryDateStr) return false;
       return (new Date().getTime() - new Date(entryDateStr).getTime()) > (7 * 24 * 60 * 60 * 1000);
     }
 
@@ -418,6 +514,7 @@
         altPhone: document.getElementById('altPhone').value.trim() || '',
         description: document.getElementById('description').value.trim() || '---',
         status: status,
+        isIndefinite: status === 'Resguardado' ? document.getElementById('isIndefinite').checked : false,
         anomalyNote: note,
         anomalyDate: status === 'Anomalía' ? entryDate : null,
         entryDate: entryDate,
@@ -434,6 +531,7 @@
       document.getElementById('description').value = '';
       document.getElementById('anomalyNote').value = '';
       document.getElementById('evidencePhoto').value = '';
+      document.getElementById('isIndefinite').checked = false;
       document.getElementById('status').value = 'Resguardado';
       toggleAnomalyMode();
       setCurrentDate();
@@ -470,6 +568,7 @@
       document.getElementById('editPhone').value = pkg.phone || '';
       document.getElementById('editAltPhone').value = pkg.altPhone || '';
       document.getElementById('editDescription').value = pkg.description !== '---' ? pkg.description : '';
+      document.getElementById('editIsIndefinite').checked = pkg.isIndefinite || false;
       document.getElementById('editEntryDate').value = pkg.entryDate || '';
 
       document.getElementById('editModal').style.display = 'flex';
@@ -487,6 +586,7 @@
         phone: document.getElementById('editPhone').value.trim(),
         altPhone: document.getElementById('editAltPhone').value.trim(),
         description: document.getElementById('editDescription').value.trim() || '---',
+        isIndefinite: document.getElementById('editIsIndefinite').checked,
         entryDate: document.getElementById('editEntryDate').value
       };
 
@@ -547,11 +647,22 @@
       return new Date(dateStr).toLocaleString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
+    // Nueva Lógica de Conteo: Varios paquetes resguardados el MISMO DÍA cuentan como 1 SOLO resguardo
     function getClientTotals(phone) {
       const clientPkgs = packages.filter(p => p.phone === phone);
       const deliveredCount = clientPkgs.filter(p => p.status === 'Entregado').length;
-      const resguardoCount = clientPkgs.filter(p => p.status === 'Resguardado').length;
       const anomalyCount = clientPkgs.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
+
+      // Agrupar resguardos por fecha YYYY-MM-DD
+      const resguardoDates = new Set();
+      clientPkgs.forEach(p => {
+        if (p.status === 'Resguardado' && p.entryDate) {
+          const dateOnly = p.entryDate.slice(0, 10);
+          resguardoDates.add(dateOnly);
+        }
+      });
+
+      const resguardoCount = resguardoDates.size; // Total de DÍAS de resguardo
       const totalPkgs = clientPkgs.length;
 
       return { deliveredCount, resguardoCount, anomalyCount, totalPkgs };
@@ -561,7 +672,7 @@
       const { deliveredCount, resguardoCount, anomalyCount } = getClientTotals(pkg.phone);
       let html = `<small style="color:#64748b">${pkg.phone}</small>`;
       if (pkg.altPhone) html += `<br><small style="color:#2563eb; font-weight:bold;">Alt: ${pkg.altPhone}</small>`;
-      html += `<span class="client-stats">✅ ${deliveredCount} ent. | 📦 ${resguardoCount} resg. | 🚨 ${anomalyCount} anom.</span>`;
+      html += `<span class="client-stats">✅ ${deliveredCount} ent. | 📦 ${resguardoCount} día(s) resg. | 🚨 ${anomalyCount} anom.</span>`;
       return html;
     }
 
@@ -569,7 +680,7 @@
       renderGeneralTable();
     }
 
-    // Render de Tabla de Reincidencia Dual (Separa Anomalías y Resguardos)
+    // Render de Tabla de Reincidencia Dual
     function renderReincidenceTable() {
       const tbody = document.getElementById('reincidenceTableBody');
       tbody.innerHTML = '';
@@ -583,13 +694,11 @@
         grouped[p.phone].items.push(p);
       });
 
-      // Filtrar clientes que tengan al menos 1 resguardo o 1 anomalía
       const clients = Object.values(grouped).filter(c => {
         const totals = getClientTotals(c.phone);
         return totals.resguardoCount > 0 || totals.anomalyCount > 0;
       });
 
-      // Ordenar por impacto: Quienes sumen más anomalías + resguardos arriba
       clients.sort((a, b) => {
         const tA = getClientTotals(a.phone);
         const tB = getClientTotals(b.phone);
@@ -623,7 +732,7 @@
               <small style="color:#64748b;">${client.phone}</small>
             </td>
             <td><strong style="color:#dc2626;">${anomalyCount} vez(ces)</strong></td>
-            <td><strong style="color:#b45309;">${resguardoCount} paquete(s)</strong></td>
+            <td><strong style="color:#b45309;">${resguardoCount} día(s)</strong></td>
             <td><span class="badge-reincidencia ${badgeClass}">${statusText}</span></td>
             <td style="white-space: nowrap;">
               <button class="btn-edit" onclick="openEditModal('${lastItem.firebaseKey}')">✏️ Editar</button>
@@ -654,18 +763,20 @@
         const pkgNum = totalCount - index;
         const tr = document.createElement('tr');
         tr.id = `pkg-row-${pkg.firebaseKey}`;
-        const isOverWeek = isOlderThanOneWeek(pkg.entryDate);
+        const isOverWeek = isOlderThanOneWeek(pkg.entryDate, pkg.isIndefinite);
         if (isOverWeek) tr.classList.add('over-week');
 
-        const daysText = calculateDaysInStorage(pkg.entryDate);
+        const daysText = calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite);
         const daysDisplay = isOverWeek ? `<span class="text-over-week">${daysText}<br><small style="font-size:0.75rem;">⚠️ +7 días</small></span>` : daysText;
+
+        let badgeIndefinite = pkg.isIndefinite ? `<span class="badge-indefinido">♾️ Indefinido</span>` : '';
 
         tr.innerHTML = `
           <td><span class="pkg-number">#${pkgNum}</span></td>
           <td><strong>${pkg.person}</strong><br>${formatPhoneDisplay(pkg)}</td>
           <td><small>${pkg.tracking}</small></td>
           <td>${pkg.description || '---'}</td>
-          <td><span class="badge badge-resguardo">${pkg.status}</span></td>
+          <td><span class="badge badge-resguardo">${pkg.status}</span>${badgeIndefinite}</td>
           <td>${formatDate(pkg.entryDate)}</td>
           <td><strong>${daysDisplay}</strong></td>
           <td style="white-space: nowrap;">
@@ -697,7 +808,6 @@
 
       resultsContainer.style.display = 'block';
 
-      // Totales del cliente buscado
       const totalAnomalies = filtered.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
       const totalPending = filtered.filter(p => p.status === 'Resguardado').length;
       const totalSigned = filtered.filter(p => p.status === 'Entregado').length;
@@ -706,16 +816,15 @@
       document.getElementById('statPending').textContent = totalPending;
       document.getElementById('statSigned').textContent = totalSigned;
 
-      // Alerta según tipo de Incumplimiento
       if (filtered.length > 0) {
         riskBanner.style.display = 'block';
 
         if (totalAnomalies >= 3) {
           riskBanner.className = 'risk-banner risk-high';
           riskBanner.innerHTML = `🚨 <strong>CLIENTE CRÍTICO EN ANOMALÍAS (${totalAnomalies} fallos)</strong><br>DENEGAR NUEVO SERVICIO / DEVOLVER PAQUETE A REMITENTE SI NO RECIBE DÍA 1.`;
-        } else if (totalPending >= 4 || (totalAnomalies + totalPending) >= 4) {
+        } else if (totalPending >= 4) {
           riskBanner.className = 'risk-banner risk-medium';
-          riskBanner.innerHTML = `⚠️ <strong>EXCESO DE RESGUARDOS ACUMULADOS (${totalPending} paquetes)</strong><br>Cliente abusa de la opción de resguardo. Notificar que no se aceptarán más resguardos indefinidos.`;
+          riskBanner.innerHTML = `⚠️ <strong>EXCESO DE RESGUARDOS ACUMULADOS (${totalPending} días)</strong><br>Cliente abusa de la opción de resguardo. Notificar que no se aceptarán más resguardos.`;
         } else {
           riskBanner.className = 'risk-banner risk-low';
           riskBanner.innerHTML = `🟢 <strong>CLIENTE DENTRO DE LÍMITES PERMITIDOS</strong><br>Cuenta con historial aceptable de entregas.`;
@@ -743,7 +852,7 @@
           if (pkg.status === 'Entregado') {
             datesHtml += `<br><small style="color:#16a34a; font-weight:bold;"><strong>Entregado:</strong> ${formatDate(pkg.signedDate)}</small>`;
           } else {
-            datesHtml += `<br><small style="color:#b45309;"><strong>Resguardo:</strong> ${calculateDaysInStorage(pkg.entryDate)}</small>`;
+            datesHtml += `<br><small style="color:#b45309;"><strong>Resguardo:</strong> ${calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite)}</small>`;
           }
 
           let photoBtnHtml = pkg.evidencePhoto ? `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button>` : '';
