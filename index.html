@@ -81,24 +81,6 @@
     
     .pkg-number { display: inline-block; background: #e2e8f0; color: #334155; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-right: 5px; }
 
-    /* Desplegable de Sugerencias de Autocompletado */
-    .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--border); border-radius: 0 0 6px 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 150px; overflow-y: auto; z-index: 99; display: none; }
-    .autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; }
-    .autocomplete-item:hover { background-color: #f8fafc; color: var(--primary); font-weight: bold; }
-
-    .checkbox-container { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px; font-size: 0.85rem; font-weight: bold; color: #1e3a8a; }
-    .checkbox-container input { width: auto; cursor: pointer; }
-
-    .highlight-row { animation: highlightAnim 2.5s ease-out; }
-    @keyframes highlightAnim {
-      0% { background-color: #fef08a; }
-      50% { background-color: #fef08a; }
-      100% { background-color: transparent; }
-    }
-
-    .search-row-clickable { cursor: pointer; }
-    .search-row-clickable:hover { background-color: #f1f5f9; }
-
     /* Estilos para el Inventario */
     .inventory-chip { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; margin: 2px; }
     .inventory-chip .remove-chip { cursor: pointer; margin-left: 5px; color: #dc2626; font-weight: bold; }
@@ -220,7 +202,7 @@
     </div>
 
     <div>
-      <!-- MÓDULO DE AUDITORÍA / CONTROL DE INVENTARIO FÍSICO -->
+      <!-- Control de Inventario / Auditoría Física -->
       <div class="card" style="border-left: 4px solid #0284c7;">
         <h2>🔍 Control de Inventario / Auditoría Física</h2>
         <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">
@@ -254,7 +236,7 @@
 
       <!-- Control de Reincidencia Dual (Resguardos vs Anomalías) -->
       <div class="card" style="border-left: 4px solid var(--danger);">
-        <h2>🚨 Análisis de Reincidencias (Días de Resguardo y Anomalías)</h2>
+        <h2>🚨 Análisis de Reincidencias (Días de Resguardo)</h2>
         <div style="overflow-x: auto; max-height: 290px; overflow-y: auto;">
           <table>
             <thead>
@@ -406,7 +388,6 @@
       });
     }
 
-    /* LÓGICA DEL MÓDULO DE INVENTARIO / AUDITORÍA */
     function addPhysicalItem() {
       const input = document.getElementById('inventoryScanInput');
       const val = input.value.trim().toLowerCase();
@@ -424,7 +405,6 @@
 
     function renderScannedChips() {
       const container = document.getElementById('scannedChipsContainer');
-      const hint = document.getElementById('emptyInventoryHint');
       
       if (scannedPhysicalTrackings.size === 0) {
         container.innerHTML = `<small style="color:#94a3b8;" id="emptyInventoryHint">Ninguna guía agregada a la revisión física aún.</small>`;
@@ -451,10 +431,8 @@
       const tbody = document.getElementById('missingAuditTableBody');
       tbody.innerHTML = '';
 
-      // Paquetes en sistema marcados como Resguardados
       const activeResguardoInSystem = packages.filter(p => p.status === 'Resguardado');
 
-      // Buscar cuáles de los marcados como Resguardados NO fueron agregados a las guías físicas
       const missingPhysical = activeResguardoInSystem.filter(p => {
         const track = (p.tracking || '').toLowerCase();
         return !scannedPhysicalTrackings.has(track);
@@ -814,6 +792,7 @@
       renderGeneralTable();
     }
 
+    // LISTA DE REINCIDENCIAS: Muestra clientes con resguardos activos o con anomalías reincidentes
     function renderReincidenceTable() {
       const tbody = document.getElementById('reincidenceTableBody');
       tbody.innerHTML = '';
@@ -827,9 +806,10 @@
         grouped[p.phone].items.push(p);
       });
 
+      // Se muestran únicamente los clientes que tienen resguardos activos o cuyo número de anomalías es crítico (>= 3)
       const clients = Object.values(grouped).filter(c => {
         const totals = getClientTotals(c.phone);
-        return totals.resguardoCount > 0 || totals.anomalyCount > 0;
+        return totals.resguardoCount > 0 || totals.anomalyCount >= 3;
       });
 
       clients.sort((a, b) => {
@@ -839,7 +819,7 @@
       });
 
       if (clients.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay registros de resguardos ni anomalías acumuladas.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay registros activos de resguardos ni clientes reincidentes.</td></tr>`;
         return;
       }
 
