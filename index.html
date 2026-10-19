@@ -40,10 +40,10 @@
     
     .btn-action { padding: 5px 10px; font-size: 0.8rem; width: auto; background-color: var(--success); }
     .btn-edit { background-color: #0284c7; padding: 5px 10px; font-size: 0.8rem; width: auto; margin-right: 4px; }
-    .btn-delete { background-color: var(--danger); padding: 5px 10px; font-size: 0.8rem; width: auto; }
+    .btn-delete { background-color: var(--danger); padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; cursor: pointer; border: none; margin-left: 4px; }
     .btn-delete:hover { background-color: #b91c1c; }
-    .btn-photo { background-color: #8b5cf6; padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; display: inline-block; cursor: pointer; text-decoration: none; }
-    .btn-upload-photo { background-color: #0284c7; padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; cursor: pointer; }
+    .btn-photo { background-color: #8b5cf6; padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; display: inline-block; cursor: pointer; text-decoration: none; margin-top: 2px; }
+    .btn-upload-photo { background-color: #0284c7; padding: 5px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; cursor: pointer; display: inline-block; margin-top: 2px; }
     .btn-restore { background-color: #0284c7; padding: 8px 12px; font-size: 0.85rem; }
 
     .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
@@ -112,7 +112,7 @@
     /* Imagen con cursor zoom */
     .preview-img { max-width: 100%; max-height: 350px; border-radius: 8px; margin: 10px auto; border: 1px solid var(--border); display: block; cursor: zoom-in; transition: transform 0.2s ease; }
 
-    /* Lightbox para Zoom Completo */
+    /* Lightbox Pantalla Completa */
     .lightbox-modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; cursor: zoom-out; }
     .lightbox-modal img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 6px; }
   </style>
@@ -649,7 +649,6 @@
 
     function closeViewPhotoModal() { document.getElementById('viewPhotoModal').style.display = 'none'; }
 
-    // Funciones para Zoom / Pantalla Completa
     function openLightbox(imgSrc) {
       document.getElementById('lightboxImage').src = imgSrc;
       document.getElementById('lightboxModal').style.display = 'flex';
@@ -864,10 +863,21 @@
           let badgeClass = pkg.status === 'Entregado' ? 'badge-entregado' : (pkg.status === 'Anomalía' ? 'badge-anomalia' : 'badge-resguardo');
           
           let actionBtn = '';
+          let photoBtnHtml = '';
+
           if (pkg.status !== 'Entregado') {
             actionBtn = `<button class="btn-action" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}')">Firmar / Entregar</button>`;
+            if (pkg.evidencePhoto) {
+              photoBtnHtml = `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button>`;
+            }
           } else {
             actionBtn = `<span style="color:#16a34a; font-weight:bold; font-size:0.75rem;">✅ Entregado</span>`;
+            
+            if (pkg.evidencePhoto) {
+              photoBtnHtml = `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button> <button class="btn-upload-photo" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}', true)">✏️ Cambiar Foto</button>`;
+            } else {
+              photoBtnHtml = `<br><button class="btn-upload-photo" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}', true)">📷 Subir Foto</button>`;
+            }
           }
 
           let datesHtml = `<small style="color:#475569;"><strong>Ingreso:</strong> ${formatDate(pkg.entryDate)}</small>`;
@@ -877,8 +887,6 @@
             datesHtml += `<br><small style="color:#b45309;"><strong>Resguardo:</strong> ${calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite)}</small>`;
           }
 
-          let photoBtnHtml = pkg.evidencePhoto ? `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button>` : '';
-
           body.innerHTML += `
             <tr class="search-row-clickable" onclick="scrollToPackage('${pkg.firebaseKey}')">
               <td><strong>${pkg.person}</strong><br><small style="color:#64748b">${pkg.tracking}</small>${photoBtnHtml}</td>
@@ -887,6 +895,7 @@
                 <span class="badge ${badgeClass}" style="margin-bottom: 4px;">${pkg.status}</span><br>
                 <button class="btn-edit" onclick="event.stopPropagation(); openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
                 ${actionBtn}
+                <button class="btn-delete" onclick="event.stopPropagation(); deleteRecord('${pkg.firebaseKey}')">🗑️ Borrar</button>
               </td>
             </tr>
           `;
@@ -902,7 +911,7 @@
         void targetRow.offsetWidth;
         targetRow.classList.add('highlight-row');
       } else {
-        alert('Este paquete fue delivered o se encuentra registrado en el historial de reportes.');
+        alert('Este paquete fue entregado o se encuentra registrado en el historial de reportes.');
       }
     }
 
