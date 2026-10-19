@@ -69,11 +69,6 @@
     .badge-entregado { background: #dcfce7; color: #15803d; }
     .badge-anomalia  { background: #fee2e2; color: #991b1b; }
     .badge-indefinido { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 4px; }
-    
-    .badge-reincidencia { padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 0.75rem; display: inline-block; }
-    .badge-low { background: #dcfce7; color: #166534; }
-    .badge-medium { background: #fef3c7; color: #92400e; }
-    .badge-high { background: #fee2e2; color: #991b1b; }
 
     .client-stats { font-size: 0.75rem; font-weight: bold; color: #475569; display: block; margin-top: 2px; }
     .empty-message { text-align: center; color: #94a3b8; padding: 15px; }
@@ -84,6 +79,24 @@
     /* Estilos para el Inventario */
     .inventory-chip { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; margin: 2px; }
     .inventory-chip .remove-chip { cursor: pointer; margin-left: 5px; color: #dc2626; font-weight: bold; }
+
+    /* Desplegable de Sugerencias de Autocompletado */
+    .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--border); border-radius: 0 0 6px 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 150px; overflow-y: auto; z-index: 99; display: none; }
+    .autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; }
+    .autocomplete-item:hover { background-color: #f8fafc; color: var(--primary); font-weight: bold; }
+
+    .checkbox-container { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px; font-size: 0.85rem; font-weight: bold; color: #1e3a8a; }
+    .checkbox-container input { width: auto; cursor: pointer; }
+
+    .highlight-row { animation: highlightAnim 2.5s ease-out; }
+    @keyframes highlightAnim {
+      0% { background-color: #fef08a; }
+      50% { background-color: #fef08a; }
+      100% { background-color: transparent; }
+    }
+
+    .search-row-clickable { cursor: pointer; }
+    .search-row-clickable:hover { background-color: #f1f5f9; }
 
     /* Modales */
     .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
@@ -234,25 +247,6 @@
         </div>
       </div>
 
-      <!-- Control de Reincidencia Dual (Resguardos vs Anomalías) -->
-      <div class="card" style="border-left: 4px solid var(--danger);">
-        <h2>🚨 Análisis de Reincidencias (Días de Resguardo)</h2>
-        <div style="overflow-x: auto; max-height: 290px; overflow-y: auto;">
-          <table>
-            <thead>
-              <tr>
-                <th>Cliente / Teléfono</th>
-                <th>🚨 Anomalías</th>
-                <th>📦 Días de Resguardo</th>
-                <th>Estado de Cliente</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="reincidenceTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-
       <!-- Tabla Principal (Paquetes activos en Resguardo) -->
       <div class="card">
         <h2>
@@ -382,7 +376,6 @@
           });
         }
         renderTables();
-        renderReincidenceTable();
         searchPackages();
         generateClientReport();
       });
@@ -790,70 +783,6 @@
 
     function renderTables() {
       renderGeneralTable();
-    }
-
-    // LISTA DE REINCIDENCIAS: Muestra clientes con resguardos activos o con anomalías reincidentes
-    function renderReincidenceTable() {
-      const tbody = document.getElementById('reincidenceTableBody');
-      tbody.innerHTML = '';
-
-      const grouped = {};
-
-      packages.forEach(p => {
-        if (!grouped[p.phone]) {
-          grouped[p.phone] = { phone: p.phone, person: p.person, items: [] };
-        }
-        grouped[p.phone].items.push(p);
-      });
-
-      // Se muestran únicamente los clientes que tienen resguardos activos o cuyo número de anomalías es crítico (>= 3)
-      const clients = Object.values(grouped).filter(c => {
-        const totals = getClientTotals(c.phone);
-        return totals.resguardoCount > 0 || totals.anomalyCount >= 3;
-      });
-
-      clients.sort((a, b) => {
-        const tA = getClientTotals(a.phone);
-        const tB = getClientTotals(b.phone);
-        return (tB.anomalyCount * 2 + tB.resguardoCount) - (tA.anomalyCount * 2 + tA.resguardoCount);
-      });
-
-      if (clients.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay registros activos de resguardos ni clientes reincidentes.</td></tr>`;
-        return;
-      }
-
-      clients.forEach(client => {
-        const { deliveredCount, resguardoCount, anomalyCount } = getClientTotals(client.phone);
-        const lastItem = client.items[client.items.length - 1];
-
-        let badgeClass = 'badge-low';
-        let statusText = '🟢 Regular';
-
-        if (anomalyCount >= 3) {
-          badgeClass = 'badge-high';
-          statusText = '🚨 Reincidente Crítico (Devolver)';
-        } else if (resguardoCount >= 4 || (anomalyCount + resguardoCount) >= 4) {
-          badgeClass = 'badge-medium';
-          statusText = '🟡 Exceso de Resguardos (Denegar)';
-        }
-
-        tbody.innerHTML += `
-          <tr>
-            <td>
-              <strong>${client.person}</strong><br>
-              <small style="color:#64748b;">${client.phone}</small>
-            </td>
-            <td><strong style="color:#dc2626;">${anomalyCount} vez(ces)</strong></td>
-            <td><strong style="color:#b45309;">${resguardoCount} día(s)</strong></td>
-            <td><span class="badge-reincidencia ${badgeClass}">${statusText}</span></td>
-            <td style="white-space: nowrap;">
-              <button class="btn-edit" onclick="openEditModal('${lastItem.firebaseKey}')">✏️ Editar</button>
-              <button class="btn-delete" onclick="deleteRecord('${lastItem.firebaseKey}')">🗑️ Borrar</button>
-            </td>
-          </tr>
-        `;
-      });
     }
 
     function renderGeneralTable() {
