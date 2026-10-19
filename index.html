@@ -99,6 +99,10 @@
     .search-row-clickable { cursor: pointer; }
     .search-row-clickable:hover { background-color: #f1f5f9; }
 
+    /* Estilos para el Inventario */
+    .inventory-chip { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; margin: 2px; }
+    .inventory-chip .remove-chip { cursor: pointer; margin-left: 5px; color: #dc2626; font-weight: bold; }
+
     /* Modales */
     .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
     .modal-content { background-color: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
@@ -216,6 +220,38 @@
     </div>
 
     <div>
+      <!-- MÓDULO DE AUDITORÍA / CONTROL DE INVENTARIO FÍSICO -->
+      <div class="card" style="border-left: 4px solid #0284c7;">
+        <h2>🔍 Control de Inventario / Auditoría Física</h2>
+        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">
+          Escanea o ingresa las guías que físicamente tienes en el estante. El sistema detectará automáticamente cuáles faltan en físico (entregados sin marcar).
+        </p>
+        
+        <div class="form-group" style="display: flex; gap: 8px;">
+          <input type="text" id="inventoryScanInput" placeholder="Escanea o escribe guía física..." onkeypress="if(event.key==='Enter'){addPhysicalItem(); event.preventDefault();}">
+          <button type="button" onclick="addPhysicalItem()" style="width: 120px; background-color: #0284c7;">➕ Agregar</button>
+        </div>
+
+        <div id="scannedChipsContainer" style="margin-bottom: 10px; min-height: 35px; border: 1px dashed var(--border); padding: 6px; border-radius: 6px;">
+          <small style="color:#94a3b8;" id="emptyInventoryHint">Ninguna guía agregada a la revisión física aún.</small>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+          <button type="button" onclick="processInventoryAudit()" style="background-color: var(--primary);">📋 Comparar con Sistema</button>
+          <button type="button" onclick="clearInventoryAudit()" style="background-color: #64748b; width: 130px;">Limpiar</button>
+        </div>
+
+        <div id="auditResults" style="display: none;">
+          <div class="section-subtitle">⚠️ Paquetes Faltantes en Físico (Fueron entregados y no se marcaron):</div>
+          <div style="overflow-x: auto; max-height: 200px; overflow-y: auto;">
+            <table>
+              <thead><tr><th>Guía</th><th>Cliente</th><th>Ingreso</th><th>Acción Rápida</th></tr></thead>
+              <tbody id="missingAuditTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- Control de Reincidencia Dual (Resguardos vs Anomalías) -->
       <div class="card" style="border-left: 4px solid var(--danger);">
         <h2>🚨 Análisis de Reincidencias (Días de Resguardo y Anomalías)</h2>
@@ -339,6 +375,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     let packages = [];
+    let scannedPhysicalTrackings = new Set();
 
     document.addEventListener('DOMContentLoaded', () => {
       setCurrentDate();
@@ -366,6 +403,81 @@
         renderReincidenceTable();
         searchPackages();
         generateClientReport();
+      });
+    }
+
+    /* LÓGICA DEL MÓDULO DE INVENTARIO / AUDITORÍA */
+    function addPhysicalItem() {
+      const input = document.getElementById('inventoryScanInput');
+      const val = input.value.trim().toLowerCase();
+      if (!val) return;
+
+      scannedPhysicalTrackings.add(val);
+      input.value = '';
+      renderScannedChips();
+    }
+
+    function removePhysicalItem(tracking) {
+      scannedPhysicalTrackings.delete(tracking);
+      renderScannedChips();
+    }
+
+    function renderScannedChips() {
+      const container = document.getElementById('scannedChipsContainer');
+      const hint = document.getElementById('emptyInventoryHint');
+      
+      if (scannedPhysicalTrackings.size === 0) {
+        container.innerHTML = `<small style="color:#94a3b8;" id="emptyInventoryHint">Ninguna guía agregada a la revisión física aún.</small>`;
+        return;
+      }
+
+      container.innerHTML = '';
+      scannedPhysicalTrackings.forEach(track => {
+        const chip = document.createElement('span');
+        chip.className = 'inventory-chip';
+        chip.innerHTML = `${track.toUpperCase()} <span class="remove-chip" onclick="removePhysicalItem('${track}')">✕</span>`;
+        container.appendChild(chip);
+      });
+    }
+
+    function clearInventoryAudit() {
+      scannedPhysicalTrackings.clear();
+      renderScannedChips();
+      document.getElementById('auditResults').style.display = 'none';
+    }
+
+    function processInventoryAudit() {
+      const resultsContainer = document.getElementById('auditResults');
+      const tbody = document.getElementById('missingAuditTableBody');
+      tbody.innerHTML = '';
+
+      // Paquetes en sistema marcados como Resguardados
+      const activeResguardoInSystem = packages.filter(p => p.status === 'Resguardado');
+
+      // Buscar cuáles de los marcados como Resguardados NO fueron agregados a las guías físicas
+      const missingPhysical = activeResguardoInSystem.filter(p => {
+        const track = (p.tracking || '').toLowerCase();
+        return !scannedPhysicalTrackings.has(track);
+      });
+
+      resultsContainer.style.display = 'block';
+
+      if (missingPhysical.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-message" style="color:#16a34a; font-weight:bold;">✅ ¡Todo en orden! Todos los paquetes registrados en resguardo están presentes en físico.</td></tr>`;
+        return;
+      }
+
+      missingPhysical.forEach(pkg => {
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${pkg.tracking}</strong></td>
+            <td>${pkg.person}</td>
+            <td><small>${formatDate(pkg.entryDate)}</small></td>
+            <td>
+              <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">✅ Entregado</button>
+            </td>
+          </tr>
+        `;
       });
     }
 
