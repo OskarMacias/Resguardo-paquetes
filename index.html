@@ -592,6 +592,16 @@
       const entryDate = document.getElementById('entryDate').value;
       const status = document.getElementById('status').value;
       const tracking = document.getElementById('trackingNum').value.trim();
+
+      // VALIDACIÓN DE GUÍA UNICA
+      if (tracking) {
+        const trackingExists = packages.some(p => p.tracking && p.tracking.toLowerCase() === tracking.toLowerCase());
+        if (trackingExists) {
+          alert("⚠️ Guía ya registrada.");
+          return;
+        }
+      }
+
       const photoBase64 = await compressAndConvertImage(document.getElementById('evidencePhoto'));
 
       let note = '';
