@@ -537,7 +537,6 @@
       }
     }
 
-    // SELECCIONAR CLIENTE Y VERIFICAR SI TIENE ANTECEDENTE DE RESGUARDO INDEFINIDO
     function selectClient(client) {
       document.getElementById('phone').value = client.phone;
       document.getElementById('personName').value = client.person;
@@ -546,7 +545,6 @@
       document.getElementById('phoneSuggestions').style.display = 'none';
       document.getElementById('nameSuggestions').style.display = 'none';
 
-      // Verificar si el cliente ha tenido resguardo indefinido en cualquier registro previo
       const hasIndefiniteHistory = packages.some(p => 
         (p.phone === client.phone || (client.person && p.person && p.person.toLowerCase() === client.person.toLowerCase())) && p.isIndefinite === true
       );
@@ -602,7 +600,6 @@
       const status = document.getElementById('status').value;
       const tracking = document.getElementById('trackingNum').value.trim();
 
-      // VALIDACIÓN DE GUÍA ÚNICA
       if (tracking) {
         const trackingExists = packages.some(p => p.tracking && p.tracking.toLowerCase() === tracking.toLowerCase());
         if (trackingExists) {
@@ -828,7 +825,7 @@
         if (isOverWeek) tr.classList.add('over-week');
 
         const daysText = calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite);
-        const daysDisplay = isOverWeek ? `<span class="text-over-week">${daysText}<br><small style="font-size:0.75rem;">⚠️ +7 días</small></span>` : daysText;
+        const daysDisplay = isOverWeek ? `<span class="text-over-week">${daysText}</span>` : daysText;
 
         let badgeIndefinite = pkg.isIndefinite ? `<span class="badge-indefinido">♾️ Indefinido</span>` : '';
 
