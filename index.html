@@ -537,12 +537,21 @@
       }
     }
 
+    // SELECCIONAR CLIENTE Y VERIFICAR SI TIENE ANTECEDENTE DE RESGUARDO INDEFINIDO
     function selectClient(client) {
       document.getElementById('phone').value = client.phone;
       document.getElementById('personName').value = client.person;
       if (client.altPhone) document.getElementById('altPhone').value = client.altPhone;
+      
       document.getElementById('phoneSuggestions').style.display = 'none';
       document.getElementById('nameSuggestions').style.display = 'none';
+
+      // Verificar si el cliente ha tenido resguardo indefinido en cualquier registro previo
+      const hasIndefiniteHistory = packages.some(p => 
+        (p.phone === client.phone || (client.person && p.person && p.person.toLowerCase() === client.person.toLowerCase())) && p.isIndefinite === true
+      );
+
+      document.getElementById('isIndefinite').checked = hasIndefiniteHistory;
     }
 
     function calculateDaysInStorage(entryDateStr, isIndefinite) {
@@ -593,7 +602,7 @@
       const status = document.getElementById('status').value;
       const tracking = document.getElementById('trackingNum').value.trim();
 
-      // VALIDACIÓN DE GUÍA UNICA
+      // VALIDACIÓN DE GUÍA ÚNICA
       if (tracking) {
         const trackingExists = packages.some(p => p.tracking && p.tracking.toLowerCase() === tracking.toLowerCase());
         if (trackingExists) {
