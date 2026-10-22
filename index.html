@@ -61,8 +61,17 @@
     table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
     th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
     th { background-color: #f8fafc; color: #64748b; }
-    tr.over-week { background-color: #fef2f2 !important; }
-    .text-over-week { color: #dc2626; font-weight: bold; }
+
+    /* ESTILOS DE COLORES POR DÍAS EN RESGUARDO */
+    tr.status-green  { background-color: #f0fdf4 !important; }
+    tr.status-yellow { background-color: #fefce8 !important; }
+    tr.status-orange { background-color: #ffedd5 !important; }
+    tr.status-red    { background-color: #fef2f2 !important; }
+
+    .text-green  { color: #16a34a; font-weight: bold; }
+    .text-yellow { color: #ca8a04; font-weight: bold; }
+    .text-orange { color: #ea580c; font-weight: bold; }
+    .text-red    { color: #dc2626; font-weight: bold; }
 
     .badge { padding: 3px 7px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
     .badge-resguardo { background: #fef3c7; color: #b45309; }
@@ -552,35 +561,26 @@
       document.getElementById('isIndefinite').checked = hasIndefiniteHistory;
     }
 
-    // CÁLCULO POR FECHA DE CALENDARIO PURA (Sugerencia aplicada)
-    function calculateDaysInStorage(entryDateStr, isIndefinite) {
-      if (isIndefinite) return '♾️ Indefinido';
-      if (!entryDateStr) return '---';
+    function getStorageDaysCount(entryDateStr, isIndefinite) {
+      if (isIndefinite) return -1; // Valor especial para indefinido
+      if (!entryDateStr) return 0;
 
       const entryDate = new Date(entryDateStr);
       const now = new Date();
 
-      // Normalizar a medianoche de calendario
       const entryMidnight = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
       const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
       const diffTime = nowMidnight - entryMidnight;
-      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      return Math.round(diffTime / (1000 * 60 * 60 * 24));
+    }
 
+    function calculateDaysInStorage(entryDateStr, isIndefinite) {
+      const diffDays = getStorageDaysCount(entryDateStr, isIndefinite);
+      if (diffDays === -1) return '♾️ Indefinido';
       if (diffDays <= 0) return 'Hoy';
       if (diffDays === 1) return '1 día';
       return `${diffDays} días`;
-    }
-
-    function isOlderThanOneWeek(entryDateStr, isIndefinite) {
-      if (isIndefinite || !entryDateStr) return false;
-      const entryDate = new Date(entryDateStr);
-      const now = new Date();
-      const entryMidnight = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
-      const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
-      const diffDays = Math.round((nowMidnight - entryMidnight) / (1000 * 60 * 60 * 24));
-      return diffDays >= 7;
     }
 
     function compressAndConvertImage(fileInput) {
@@ -835,11 +835,32 @@
         const pkgNum = totalCount - index;
         const tr = document.createElement('tr');
         tr.id = `pkg-row-${pkg.firebaseKey}`;
-        const isOverWeek = isOlderThanOneWeek(pkg.entryDate, pkg.isIndefinite);
-        if (isOverWeek) tr.classList.add('over-week');
+        
+        const diffDays = getStorageDaysCount(pkg.entryDate, pkg.isIndefinite);
+        
+        let rowClass = '';
+        let textClass = '';
+
+        if (!pkg.isIndefinite) {
+          if (diffDays >= 10) {
+            rowClass = 'status-red';
+            textClass = 'text-red';
+          } else if (diffDays >= 7) {
+            rowClass = 'status-orange';
+            textClass = 'text-orange';
+          } else if (diffDays >= 2) {
+            rowClass = 'status-yellow';
+            textClass = 'text-yellow';
+          } else if (diffDays === 1) {
+            rowClass = 'status-green';
+            textClass = 'text-green';
+          }
+        }
+
+        if (rowClass) tr.classList.add(rowClass);
 
         const daysText = calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite);
-        const daysDisplay = isOverWeek ? `<span class="text-over-week">${daysText}</span>` : daysText;
+        const daysDisplay = textClass ? `<span class="${textClass}">${daysText}</span>` : daysText;
 
         let badgeIndefinite = pkg.isIndefinite ? `<span class="badge-indefinido">♾️ Indefinido</span>` : '';
 
