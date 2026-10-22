@@ -62,16 +62,18 @@
     th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
     th { background-color: #f8fafc; color: #64748b; }
 
-    /* ESTILOS DE COLORES POR DÍAS EN RESGUARDO */
-    tr.status-green  { background-color: #f0fdf4 !important; }
-    tr.status-yellow { background-color: #fefce8 !important; }
-    tr.status-orange { background-color: #ffedd5 !important; }
-    tr.status-red    { background-color: #fef2f2 !important; }
+    /* ESTILOS RESALTADOS CON TONOS MÁS INTENSOS Y BORDE LATERAL */
+    tr.status-green  { background-color: #dcfce7 !important; border-left: 6px solid #16a34a !important; }
+    tr.status-yellow { background-color: #fef08a !important; border-left: 6px solid #ca8a04 !important; }
+    tr.status-orange { background-color: #ffedd5 !important; border-left: 6px solid #ea580c !important; }
+    tr.status-red    { background-color: #fee2e2 !important; border-left: 6px solid #dc2626 !important; }
 
-    .text-green  { color: #16a34a; font-weight: bold; }
-    .text-yellow { color: #ca8a04; font-weight: bold; }
-    .text-orange { color: #ea580c; font-weight: bold; }
-    .text-red    { color: #dc2626; font-weight: bold; }
+    /* ETIQUETAS DESTACADAS EN LA COLUMNA DE DÍAS */
+    .day-badge { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 0.82rem; display: inline-block; text-align: center; }
+    .day-badge.green  { background-color: #16a34a; color: white; }
+    .day-badge.yellow { background-color: #ca8a04; color: white; }
+    .day-badge.orange { background-color: #ea580c; color: white; }
+    .day-badge.red    { background-color: #dc2626; color: white; }
 
     .badge { padding: 3px 7px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
     .badge-resguardo { background: #fef3c7; color: #b45309; }
@@ -562,7 +564,7 @@
     }
 
     function getStorageDaysCount(entryDateStr, isIndefinite) {
-      if (isIndefinite) return -1; // Valor especial para indefinido
+      if (isIndefinite) return -1;
       if (!entryDateStr) return 0;
 
       const entryDate = new Date(entryDateStr);
@@ -839,28 +841,28 @@
         const diffDays = getStorageDaysCount(pkg.entryDate, pkg.isIndefinite);
         
         let rowClass = '';
-        let textClass = '';
+        let colorKey = '';
 
         if (!pkg.isIndefinite) {
           if (diffDays >= 10) {
             rowClass = 'status-red';
-            textClass = 'text-red';
+            colorKey = 'red';
           } else if (diffDays >= 7) {
             rowClass = 'status-orange';
-            textClass = 'text-orange';
+            colorKey = 'orange';
           } else if (diffDays >= 2) {
             rowClass = 'status-yellow';
-            textClass = 'text-yellow';
+            colorKey = 'yellow';
           } else if (diffDays === 1) {
             rowClass = 'status-green';
-            textClass = 'text-green';
+            colorKey = 'green';
           }
         }
 
         if (rowClass) tr.classList.add(rowClass);
 
         const daysText = calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite);
-        const daysDisplay = textClass ? `<span class="${textClass}">${daysText}</span>` : daysText;
+        const daysDisplay = colorKey ? `<span class="day-badge ${colorKey}">${daysText}</span>` : daysText;
 
         let badgeIndefinite = pkg.isIndefinite ? `<span class="badge-indefinido">♾️ Indefinido</span>` : '';
 
@@ -871,7 +873,7 @@
           <td>${pkg.description || '---'}</td>
           <td><span class="badge badge-resguardo">${pkg.status}</span>${badgeIndefinite}</td>
           <td>${formatDate(pkg.entryDate)}</td>
-          <td><strong>${daysDisplay}</strong></td>
+          <td>${daysDisplay}</td>
           <td style="white-space: nowrap;">
             <button class="btn-edit" onclick="openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
             <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">Firmar / Entregar</button>
