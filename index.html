@@ -230,7 +230,7 @@
       <div class="card" style="border-left: 4px solid #0284c7;">
         <h2>🔍 Control de Inventario / Auditoría Física</h2>
         <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">
-          Escanea o ingresa las guías que físicamente tienes en el estante. El sistema detectará automáticamente cuáles faltan en físico (entregados sin marcar).
+          Escanea o ingresa las guías que físicamente tienes en el estante. El sistema las clasificará en 3 grupos automáticamente.
         </p>
         
         <div class="form-group" style="display: flex; gap: 8px;">
@@ -247,14 +247,40 @@
           <button type="button" onclick="clearInventoryAudit()" style="background-color: #64748b; width: 130px;">Limpiar</button>
         </div>
 
+        <!-- RESULTADOS AUDITORÍA DIVIDIDOS EN 3 CATEGORÍAS -->
         <div id="auditResults" style="display: none;">
-          <div class="section-subtitle">⚠️ Paquetes Faltantes en Físico (Fueron entregados y no se marcaron):</div>
-          <div style="overflow-x: auto; max-height: 200px; overflow-y: auto;">
-            <table>
-              <thead><tr><th>Guía</th><th>Cliente</th><th>Ingreso</th><th>Acción Rápida</th></tr></thead>
-              <tbody id="missingAuditTableBody"></tbody>
-            </table>
+          
+          <!-- 1. CORRECTOS -->
+          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+            <strong style="color: #166534; font-size: 0.9rem;">🟢 Coincidentes en Físico y Sistema: <span id="countMatched">0</span></strong>
           </div>
+
+          <!-- 2. ESCANEADOS PERO NO REGISTRADOS -->
+          <div id="unregisteredAuditContainer" style="display: none; margin-bottom: 15px;">
+            <div class="section-subtitle" style="border-left-color: #d97706; color: #b45309;">
+              ❓ Escaneados en Físico pero NO Registrados en Sistema:
+            </div>
+            <div style="overflow-x: auto; max-height: 180px; overflow-y: auto;">
+              <table>
+                <thead><tr><th>Guía Escaneada</th><th>Estado</th><th>Acción Rápida</th></tr></thead>
+                <tbody id="unregisteredAuditTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 3. FALTANTES EN FÍSICO -->
+          <div id="missingAuditContainer" style="display: none; margin-bottom: 10px;">
+            <div class="section-subtitle" style="border-left-color: #dc2626; color: #991b1b;">
+              ⚠️ Paquetes Faltantes en Físico (Entregados sin marcar salida):
+            </div>
+            <div style="overflow-x: auto; max-height: 200px; overflow-y: auto;">
+              <table>
+                <thead><tr><th>Guía</th><th>Cliente</th><th>Ingreso</th><th>Acción Rápida</th></tr></thead>
+                <tbody id="missingAuditTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -430,37 +456,89 @@
       document.getElementById('auditResults').style.display = 'none';
     }
 
+    // PROCESO DE AUDITORÍA DIVIDIDO EN 3 CATEGORÍAS
     function processInventoryAudit() {
       const resultsContainer = document.getElementById('auditResults');
-      const tbody = document.getElementById('missingAuditTableBody');
-      tbody.innerHTML = '';
+      const countMatchedEl = document.getElementById('countMatched');
+      
+      const missingContainer = document.getElementById('missingAuditContainer');
+      const missingTbody = document.getElementById('missingAuditTableBody');
+      
+      const unregisteredContainer = document.getElementById('unregisteredAuditContainer');
+      const unregisteredTbody = document.getElementById('unregisteredAuditTableBody');
+
+      missingTbody.innerHTML = '';
+      unregisteredTbody.innerHTML = '';
 
       const activeResguardoInSystem = packages.filter(p => p.status === 'Resguardado');
+      
+      // Mapas de comparación
+      const systemTrackingsSet = new Set(activeResguardoInSystem.map(p => (p.tracking || '').toLowerCase()));
+      const allRegisteredTrackingsSet = new Set(packages.map(p => (p.tracking || '').toLowerCase()));
 
+      let matchedCount = 0;
+      let unregisteredTrackings = [];
+
+      // 1. Clasificar lo que se escaneó en físico
+      scannedPhysicalTrackings.forEach(scannedTrack => {
+        if (systemTrackingsSet.has(scannedTrack)) {
+          matchedCount++;
+        } else if (!allRegisteredTrackingsSet.has(scannedTrack)) {
+          unregisteredTrackings.push(scannedTrack);
+        }
+      });
+
+      // 2. Encontrar lo que falta en físico (Sigue activo en sistema pero no se escaneó)
       const missingPhysical = activeResguardoInSystem.filter(p => {
         const track = (p.tracking || '').toLowerCase();
         return !scannedPhysicalTrackings.has(track);
       });
 
       resultsContainer.style.display = 'block';
+      countMatchedEl.textContent = `${matchedCount} paquete(s)`;
 
-      if (missingPhysical.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="empty-message" style="color:#16a34a; font-weight:bold;">✅ ¡Todo en orden! Todos los paquetes registrados en resguardo están presentes en físico.</td></tr>`;
-        return;
+      // Mostrar No Registrados
+      if (unregisteredTrackings.length > 0) {
+        unregisteredContainer.style.display = 'block';
+        unregisteredTrackings.forEach(track => {
+          unregisteredTbody.innerHTML += `
+            <tr>
+              <td><strong>${track.toUpperCase()}</strong></td>
+              <td><span class="badge badge-anomalia">No registrado</span></td>
+              <td>
+                <button class="btn-edit" onclick="prefillRegisterForm('${track}')">➕ Registrar en Sistema</button>
+              </td>
+            </tr>
+          `;
+        });
+      } else {
+        unregisteredContainer.style.display = 'none';
       }
 
-      missingPhysical.forEach(pkg => {
-        tbody.innerHTML += `
-          <tr>
-            <td><strong>${pkg.tracking}</strong></td>
-            <td>${pkg.person}</td>
-            <td><small>${formatDate(pkg.entryDate)}</small></td>
-            <td>
-              <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">✅ Entregado</button>
-            </td>
-          </tr>
-        `;
-      });
+      // Mostrar Faltantes
+      if (missingPhysical.length > 0) {
+        missingContainer.style.display = 'block';
+        missingPhysical.forEach(pkg => {
+          missingTbody.innerHTML += `
+            <tr>
+              <td><strong>${pkg.tracking}</strong></td>
+              <td>${pkg.person}</td>
+              <td><small>${formatDate(pkg.entryDate)}</small></td>
+              <td>
+                <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">✅ Entregado</button>
+              </td>
+            </tr>
+          `;
+        });
+      } else {
+        missingContainer.style.display = 'none';
+      }
+    }
+
+    function prefillRegisterForm(tracking) {
+      document.getElementById('trackingNum').value = tracking.toUpperCase();
+      document.getElementById('trackingNum').focus();
+      document.getElementById('packageForm').scrollIntoView({ behavior: 'smooth' });
     }
 
     function setCurrentDate() {
