@@ -138,7 +138,7 @@
       <div class="card">
         <h2>🔍 Buscador General</h2>
         <div class="form-group">
-          <input type="text" id="searchInput" placeholder="Escribe nombre, teléfono o # guía..." oninput="searchPackages()">
+          <input type="text" id="searchInput" placeholder="Escribe nombre, teléfono o # guía..." oninput="debouncedSearchPackages()">
         </div>
 
         <div id="searchResults" style="display: none;">
@@ -389,6 +389,7 @@
     const db = firebase.database();
     let packages = [];
     let scannedPhysicalTrackings = new Set();
+    let searchTimeout = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       setCurrentDate();
@@ -456,7 +457,6 @@
       document.getElementById('auditResults').style.display = 'none';
     }
 
-    // PROCESO DE AUDITORÍA DIVIDIDO EN 3 CATEGORÍAS
     function processInventoryAudit() {
       const resultsContainer = document.getElementById('auditResults');
       const countMatchedEl = document.getElementById('countMatched');
@@ -472,14 +472,12 @@
 
       const activeResguardoInSystem = packages.filter(p => p.status === 'Resguardado');
       
-      // Mapas de comparación
       const systemTrackingsSet = new Set(activeResguardoInSystem.map(p => (p.tracking || '').toLowerCase()));
       const allRegisteredTrackingsSet = new Set(packages.map(p => (p.tracking || '').toLowerCase()));
 
       let matchedCount = 0;
       let unregisteredTrackings = [];
 
-      // 1. Clasificar lo que se escaneó en físico
       scannedPhysicalTrackings.forEach(scannedTrack => {
         if (systemTrackingsSet.has(scannedTrack)) {
           matchedCount++;
@@ -488,7 +486,6 @@
         }
       });
 
-      // 2. Encontrar lo que falta en físico (Sigue activo en sistema pero no se escaneó)
       const missingPhysical = activeResguardoInSystem.filter(p => {
         const track = (p.tracking || '').toLowerCase();
         return !scannedPhysicalTrackings.has(track);
@@ -497,7 +494,6 @@
       resultsContainer.style.display = 'block';
       countMatchedEl.textContent = `${matchedCount} paquete(s)`;
 
-      // Mostrar No Registrados
       if (unregisteredTrackings.length > 0) {
         unregisteredContainer.style.display = 'block';
         unregisteredTrackings.forEach(track => {
@@ -515,7 +511,6 @@
         unregisteredContainer.style.display = 'none';
       }
 
-      // Mostrar Faltantes
       if (missingPhysical.length > 0) {
         missingContainer.style.display = 'block';
         missingPhysical.forEach(pkg => {
@@ -959,6 +954,14 @@
         `;
         tbody.appendChild(tr);
       });
+    }
+
+    // RETARDO DE BÚSQUEDA (DEBOUNCE) PARA EVITAR QUE SE TRABE EL TECLADO
+    function debouncedSearchPackages() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        searchPackages();
+      }, 300);
     }
 
     function searchPackages() {
