@@ -41,7 +41,8 @@
     
     .form-group { margin-bottom: 12px; position: relative; }
     label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.85rem; }
-    input, select { width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; outline: none; }
+    input, select, textarea { width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; outline: none; }
+    textarea { resize: vertical; min-height: 50px; }
     
     button { background-color: var(--primary); color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; }
     button:hover { background-color: var(--primary-hover); }
@@ -98,6 +99,9 @@
     /* Estilos para el Inventario */
     .inventory-chip { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; margin: 2px; }
     .inventory-chip .remove-chip { cursor: pointer; margin-left: 5px; color: #dc2626; font-weight: bold; }
+
+    /* Chips para Guías Múltiples */
+    .tracking-chip { display: inline-block; background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; margin: 2px; border: 1px solid #bfdbfe; }
 
     /* Desplegable de Sugerencias de Autocompletado */
     .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--border); border-radius: 0 0 6px 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 150px; overflow-y: auto; z-index: 99; display: none; }
@@ -169,9 +173,9 @@
         </div>
       </div>
 
-      <!-- Formulario Unificado -->
+      <!-- Formulario Unificado con Soporte para Múltiples Guías -->
       <div class="card">
-        <h2>Registrar Paquete / Anomalía</h2>
+        <h2>Registrar Paquete(s) / Anomalía</h2>
         <form id="packageForm" autocomplete="off">
           <div class="form-group">
             <label>Estado del Registro</label>
@@ -196,7 +200,13 @@
             <div id="nameSuggestions" class="autocomplete-list"></div>
           </div>
 
-          <div class="form-group" id="trackingGroup"><label>Número de Guía</label><input type="text" id="trackingNum"></div>
+          <!-- Campo Múltiples Guías -->
+          <div class="form-group" id="trackingGroup">
+            <label>Número(s) de Guía <small style="color:#2563eb; font-weight:normal;">(Separa varias guías con comas o saltos de línea)</small></label>
+            <textarea id="trackingNum" placeholder="Ej: JMX101, JMX102, JMX103..." oninput="updateTrackingPreview()"></textarea>
+            <div id="trackingPreview" style="margin-top: 4px;"></div>
+          </div>
+
           <div class="form-group"><label>Teléfono Alt. (Opcional)</label><input type="tel" id="altPhone"></div>
           <div class="form-group" id="descGroup"><label>Descripción (Opcional)</label><input type="text" id="description"></div>
 
@@ -221,7 +231,7 @@
 
           <div class="form-group"><label>Foto de Evidencia (Galería o Cámara)</label><input type="file" id="evidencePhoto" accept="image/*"></div>
           <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="entryDate" required></div>
-          <button type="submit">Guardar Registro</button>
+          <button type="submit" id="saveSubmitBtn">Guardar Registro</button>
         </form>
       </div>
 
@@ -427,6 +437,34 @@
       });
     }
 
+    // Extraer array de guías limpias desde el área de texto
+    function getParsedTrackings() {
+      const rawText = document.getElementById('trackingNum').value;
+      if (!rawText) return [];
+      return rawText
+        .split(/[\n,]+/)
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+    }
+
+    function updateTrackingPreview() {
+      const trackings = getParsedTrackings();
+      const previewDiv = document.getElementById('trackingPreview');
+      const submitBtn = document.getElementById('saveSubmitBtn');
+
+      if (trackings.length <= 1) {
+        previewDiv.innerHTML = '';
+        submitBtn.textContent = "Guardar Registro";
+      } else {
+        let chipsHtml = `<span style="font-size:0.75rem; color:#475569; display:block; margin-bottom:2px;">Guías a registrar de forma independiente (${trackings.length}):</span>`;
+        trackings.forEach(t => {
+          chipsHtml += `<span class="tracking-chip">📦 ${t}</span>`;
+        });
+        previewDiv.innerHTML = chipsHtml;
+        submitBtn.textContent = `Guardar ${trackings.length} Registros Independientes`;
+      }
+    }
+
     function addPhysicalItem() {
       const input = document.getElementById('inventoryScanInput');
       const val = input.value.trim().toLowerCase();
@@ -540,6 +578,7 @@
 
     function prefillRegisterForm(tracking) {
       document.getElementById('trackingNum').value = tracking.toUpperCase();
+      updateTrackingPreview();
       document.getElementById('trackingNum').focus();
       document.getElementById('packageForm').scrollIntoView({ behavior: 'smooth' });
     }
@@ -691,18 +730,30 @@
       });
     }
 
+    // REGISTRO DE PAQUETES (INDIVIDUAL O MÚLTIPLE)
     document.getElementById('packageForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const entryDate = document.getElementById('entryDate').value;
       const status = document.getElementById('status').value;
-      const tracking = document.getElementById('trackingNum').value.trim();
+      const trackings = getParsedTrackings();
 
-      if (tracking) {
-        const trackingExists = packages.some(p => p.tracking && p.tracking.toLowerCase() === tracking.toLowerCase());
-        if (trackingExists) {
-          alert("⚠️ Guía ya registrada.");
-          return;
+      if (trackings.length === 0 && status !== 'Anomalía') {
+        trackings.push('S/N-' + Date.now().toString().slice(-4));
+      } else if (trackings.length === 0 && status === 'Anomalía') {
+        trackings.push('');
+      }
+
+      // Validar si alguna guía ya existe en el sistema
+      const existingTrackings = [];
+      trackings.forEach(t => {
+        if (t && packages.some(p => p.tracking && p.tracking.toLowerCase() === t.toLowerCase())) {
+          existingTrackings.push(t);
         }
+      });
+
+      if (existingTrackings.length > 0) {
+        alert(`⚠️ Las siguientes guías ya están registradas:\n${existingTrackings.join(', ')}`);
+        return;
       }
 
       const photoBase64 = await compressAndConvertImage(document.getElementById('evidencePhoto'));
@@ -713,24 +764,34 @@
         note = selReason === 'OTRO' ? document.getElementById('anomalyNote').value.trim() : selReason;
       }
 
-      const newPackage = {
-        id: Date.now(),
-        tracking: tracking || 'S/N-' + Date.now().toString().slice(-4),
-        person: document.getElementById('personName').value.trim(),
-        phone: document.getElementById('phone').value.trim(),
-        altPhone: document.getElementById('altPhone').value.trim() || '',
-        description: document.getElementById('description').value.trim() || '---',
-        status: status,
-        isIndefinite: status === 'Resguardado' ? document.getElementById('isIndefinite').checked : false,
-        anomalyNote: note,
-        anomalyDate: status === 'Anomalía' ? entryDate : null,
-        entryDate: entryDate,
-        signedDate: status === 'Entregado' ? entryDate : null,
-        evidencePhoto: photoBase64 || null
-      };
+      const person = document.getElementById('personName').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const altPhone = document.getElementById('altPhone').value.trim() || '';
+      const description = document.getElementById('description').value.trim() || '---';
+      const isIndefinite = status === 'Resguardado' ? document.getElementById('isIndefinite').checked : false;
 
-      db.ref('packages').push(newPackage);
+      // Guardar cada paquete como un objeto independiente en Firebase
+      trackings.forEach((t, idx) => {
+        const newPackage = {
+          id: Date.now() + idx,
+          tracking: t || 'S/N-' + Date.now().toString().slice(-4),
+          person: person,
+          phone: phone,
+          altPhone: altPhone,
+          description: description,
+          status: status,
+          isIndefinite: isIndefinite,
+          anomalyNote: note,
+          anomalyDate: status === 'Anomalía' ? entryDate : null,
+          entryDate: entryDate,
+          signedDate: status === 'Entregado' ? entryDate : null,
+          evidencePhoto: photoBase64 || null
+        };
 
+        db.ref('packages').push(newPackage);
+      });
+
+      // Limpiar Formulario
       document.getElementById('trackingNum').value = '';
       document.getElementById('personName').value = '';
       document.getElementById('phone').value = '';
@@ -740,6 +801,7 @@
       document.getElementById('evidencePhoto').value = '';
       document.getElementById('isIndefinite').checked = false;
       document.getElementById('status').value = 'Resguardado';
+      updateTrackingPreview();
       toggleAnomalyMode();
       setCurrentDate();
     });
