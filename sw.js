@@ -2,7 +2,8 @@ const CACHE_NAME = 'paquetes-v3';
 const ASSETS = [
   './',
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icon.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -23,7 +24,6 @@ self.addEventListener('activate', (e) => {
   clients.claim();
 });
 
-// Este fetch es OBLIGATORIO para que Android quite la barra azul
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(e.request).catch(() => {
