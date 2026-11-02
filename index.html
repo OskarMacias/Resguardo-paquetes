@@ -118,13 +118,13 @@
         </form>
       </section>
 
-      <!-- Respaldos -->
+      <!-- Respaldos Guardados -->
       <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
         <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
           📥 Cargar Respaldo Guardado
         </h2>
         <input type="file" id="backup-file" accept=".json" class="hidden">
-        <button id="btn-upload-backup" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-medium py-2 px-3 rounded-lg text-xs transition-colors">
+        <button id="btn-upload-backup" onclick="document.getElementById('backup-file').click()" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-medium py-2 px-3 rounded-lg text-xs transition-colors">
           Subir archivo .json a la Nube
         </button>
       </section>
@@ -192,13 +192,94 @@
     </div>
   </main>
 
-  <!-- Registro del Service Worker -->
+  <!-- Lógica JavaScript y Firebase -->
   <script>
+    // Configuración y conexión de Firebase Realtime Database
+    const firebaseConfig = {
+      // Pega aquí tus credenciales originales de Firebase si las conservas
+    };
+
+    if (typeof firebase !== 'undefined' && firebaseConfig.databaseURL) {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      const db = firebase.database();
+      const packagesRef = db.ref('paquetes');
+
+      packagesRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        renderPackages(data);
+      });
+    }
+
+    // Función para renderizar paquetes en la tabla
+    function renderPackages(data) {
+      const tbody = document.getElementById('packages-table-body');
+      const totalCount = document.getElementById('total-count');
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+
+      if (!data) {
+        if (totalCount) totalCount.textContent = 'Total: 0';
+        return;
+      }
+
+      const list = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+      if (totalCount) totalCount.textContent = `Total: ${list.length}`;
+
+      list.reverse().forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-50 transition-colors border-b border-slate-100';
+        row.innerHTML = `
+          <td class="p-3 font-semibold text-slate-500">#${list.length - index}</td>
+          <td class="p-3 font-bold text-slate-800">${item.nombre || item.cliente || 'N/A'}<br><span class="text-slate-400 font-normal">${item.telefono || ''}</span></td>
+          <td class="p-3 font-mono text-slate-700">${item.guia || item.guias || ''}</td>
+          <td class="p-3 text-slate-600">${item.descripcion || '-'}</td>
+          <td class="p-3"><span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-semibold">${item.estado || 'En Resguardo'}</span></td>
+          <td class="p-3 text-slate-500">${item.fechaIngreso || item.fecha || ''}</td>
+          <td class="p-3"><span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">${item.dias || '1 día'}</span></td>
+          <td class="p-3 text-center">
+            <button class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700">Firmar / Entregar</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Lectura de archivo .json para restaurar respaldo manual
+    document.getElementById('backup-file')?.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const jsonContent = JSON.parse(event.target.result);
+          
+          // Si Firebase está conectado, guardar en la nube
+          if (typeof firebase !== 'undefined' && firebase.apps.length) {
+            firebase.database().ref('paquetes').set(jsonContent)
+              .then(() => alert('Respaldo .json cargado y sincronizado con éxito en la nube.'))
+              .catch(err => alert('Error al subir a la nube: ' + err.message));
+          } else {
+            // Carga local
+            renderPackages(jsonContent);
+            alert('Respaldo cargado localmente en pantalla.');
+          }
+        } catch (err) {
+          alert('El archivo seleccionado no tiene un formato .json válido.');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // Registro del Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
-          .catch(err => console.log('Error al registrar Service Worker:', err));
+          .then(reg => console.log('Service Worker registrado:', reg.scope))
+          .catch(err => console.log('Error SW:', err));
       });
     }
   </script>
