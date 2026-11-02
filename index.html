@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Control de Paquetes y Reincidencias</title>
 
-  <!-- ICONO REPRESENTATIVO PARA LA PANTALLA PRINCIPAL DEL CELULAR (PWA / FAVICON) -->
+  <!-- VÍNCULO AL MANIFEST DE APLICACIÓN INSTALABLE (PWA) -->
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%232563eb'/><path d='M256 96L112 168v176l144 72 144-72V168L256 96zm0 42l104 52-40 20-104-52 40-20zm-116 66l104 52v124l-104-52V204zm232 124l-104 52V256l104-52v124z' fill='%23ffffff'/></svg>">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%232563eb'/><path d='M256 96L112 168v176l144 72 144-72V168L256 96zm0 42l104 52-40 20-104-52 40-20zm-116 66l104 52v124l-104-52V204zm232 124l-104 52V256l104-52v124z' fill='%23ffffff'/></svg>">
   <meta name="mobile-web-app-capable" content="yes">
@@ -409,6 +410,17 @@
     let scannedPhysicalTrackings = new Set();
     let searchTimeout = null;
 
+    // REGISTRO AUTOMÁTICO DE SERVICE WORKER PARA PERMITIR INSTALAR COMO APLICACIÓN (PWA)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swBlob = new Blob([
+          `self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });`
+        ], { type: 'text/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swUrl).catch(() => {});
+      });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       setCurrentDate();
       setDefaultReportDates();
@@ -437,7 +449,6 @@
       });
     }
 
-    // Extraer array de guías limpias desde el área de texto
     function getParsedTrackings() {
       const rawText = document.getElementById('trackingNum').value;
       if (!rawText) return [];
@@ -730,7 +741,6 @@
       });
     }
 
-    // REGISTRO DE PAQUETES (INDIVIDUAL O MÚLTIPLE)
     document.getElementById('packageForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const entryDate = document.getElementById('entryDate').value;
@@ -743,7 +753,6 @@
         trackings.push('');
       }
 
-      // Validar si alguna guía ya existe en el sistema
       const existingTrackings = [];
       trackings.forEach(t => {
         if (t && packages.some(p => p.tracking && p.tracking.toLowerCase() === t.toLowerCase())) {
@@ -770,7 +779,6 @@
       const description = document.getElementById('description').value.trim() || '---';
       const isIndefinite = status === 'Resguardado' ? document.getElementById('isIndefinite').checked : false;
 
-      // Guardar cada paquete como un objeto independiente en Firebase
       trackings.forEach((t, idx) => {
         const newPackage = {
           id: Date.now() + idx,
@@ -791,7 +799,6 @@
         db.ref('packages').push(newPackage);
       });
 
-      // Limpiar Formulario
       document.getElementById('trackingNum').value = '';
       document.getElementById('personName').value = '';
       document.getElementById('phone').value = '';
