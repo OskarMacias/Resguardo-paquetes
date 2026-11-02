@@ -1,0 +1,17 @@
+{
+  "short_name": "Control Paquetes",
+  "name": "Control de Paquetes y Reincidencias",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%232563eb'/><path d='M256 96L112 168v176l144 72 144-72V168L256 96zm0 42l104 52-40 20-104-52 40-20zm-116 66l104 52v124l-104-52V204zm232 124l-104 52V256l104-52v124z' fill='%23ffffff'/></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "display": "standalone",
+  "orientation": "portrait"
+}
