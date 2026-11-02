@@ -1,4 +1,4 @@
-const CACHE_NAME = 'paquetes-v2';
+const CACHE_NAME = 'paquetes-v3';
 const ASSETS = [
   './',
   './index.html',
