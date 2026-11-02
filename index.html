@@ -6,7 +6,7 @@
   <title>Control de Paquetes y Reincidencias</title>
 
   <!-- VÍNCULO AL MANIFEST DE APLICACIÓN INSTALABLE (PWA) -->
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%232563eb'/><path d='M256 96L112 168v176l144 72 144-72V168L256 96zm0 42l104 52-40 20-104-52 40-20zm-116 66l104 52v124l-104-52V204zm232 124l-104 52V256l104-52v124z' fill='%23ffffff'/></svg>">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%232563eb'/><path d='M256 96L112 168v176l144 72 144-72V168L256 96zm0 42l104 52-40 20-104-52 40-20zm-116 66l104 52v124l-104-52V204zm232 124l-104 52V256l104-52v124z' fill='%23ffffff'/></svg>">
   <meta name="mobile-web-app-capable" content="yes">
@@ -410,11 +410,13 @@
     let scannedPhysicalTrackings = new Set();
     let searchTimeout = null;
 
-    // REGISTRO AUTOMÁTICO DE SERVICE WORKER PARA PERMITIR INSTALAR COMO APLICACIÓN (PWA)
+    // REGISTRO DE SERVICE WORKER CON RESPUESTA DE FALLBACK PARA PWA COMPATIBLE
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         const swBlob = new Blob([
-          `self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });`
+          `self.addEventListener('install', (e) => { self.skipWaiting(); });
+           self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
+           self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request).catch(() => new Response('Offline'))); });`
         ], { type: 'text/javascript' });
         const swUrl = URL.createObjectURL(swBlob);
         navigator.serviceWorker.register(swUrl).catch(() => {});
