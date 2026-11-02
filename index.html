@@ -410,16 +410,10 @@
     let scannedPhysicalTrackings = new Set();
     let searchTimeout = null;
 
-    // REGISTRO DE SERVICE WORKER CON RESPUESTA DE FALLBACK PARA PWA COMPATIBLE
+    // REGISTRO DEL SERVICE WORKER EXTERNO sw.js
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        const swBlob = new Blob([
-          `self.addEventListener('install', (e) => { self.skipWaiting(); });
-           self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
-           self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request).catch(() => new Response('Offline'))); });`
-        ], { type: 'text/javascript' });
-        const swUrl = URL.createObjectURL(swBlob);
-        navigator.serviceWorker.register(swUrl).catch(() => {});
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
       });
     }
 
