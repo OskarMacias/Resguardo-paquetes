@@ -458,7 +458,7 @@
   </div>
 
   <script>
-    // Credenciales originales conectadas a la base de datos de Firebase
+    // Credenciales de Firebase y conexión con base de datos real
     const firebaseConfig = {
       apiKey: "AIzaSyBnRRdSKC6v4LV0b9rTmyI1c9P-_A-sP-o",
       authDomain: "resguardo-paquetes.firebaseapp.com",
@@ -520,8 +520,10 @@
 
       document.addEventListener('click', (e) => {
         if (!e.target.closest('.form-group')) {
-          document.getElementById('phoneSuggestions').style.display = 'none';
-          document.getElementById('nameSuggestions').style.display = 'none';
+          const pSugg = document.getElementById('phoneSuggestions');
+          const nSugg = document.getElementById('nameSuggestions');
+          if(pSugg) pSugg.style.display = 'none';
+          if(nSugg) nSugg.style.display = 'none';
         }
       });
     });
@@ -539,6 +541,105 @@
         searchPackages();
         generateClientReport();
       });
+    }
+
+    function debouncedSearchPackages() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        searchPackages();
+      }, 150);
+    }
+
+    function searchPackages() {
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+      const resultsContainer = document.getElementById('searchResults');
+      const riskBanner = document.getElementById('riskBanner');
+
+      if (!query) { 
+        resultsContainer.style.display = 'none'; 
+        riskBanner.style.display = 'none';
+        return; 
+      }
+
+      const filtered = packages.filter(p => 
+        (p.person && p.person.toLowerCase().includes(query)) ||
+        (p.phone && p.phone.toLowerCase().includes(query)) ||
+        (p.altPhone && p.altPhone.toLowerCase().includes(query)) ||
+        (p.tracking && p.tracking.toLowerCase().includes(query))
+      );
+
+      resultsContainer.style.display = 'block';
+
+      const totalAnomalies = filtered.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
+      const totalPending = filtered.filter(p => p.status === 'Resguardado').length;
+      const totalSigned = filtered.filter(p => p.status === 'Entregado').length;
+
+      document.getElementById('statAnomalies').textContent = totalAnomalies;
+      document.getElementById('statPending').textContent = totalPending;
+      document.getElementById('statSigned').textContent = totalSigned;
+
+      if (filtered.length > 0) {
+        riskBanner.style.display = 'block';
+        if (totalAnomalies >= 3) {
+          riskBanner.className = 'risk-banner risk-high';
+          riskBanner.innerHTML = `🚨 <strong>CLIENTE CRÍTICO EN ANOMALÍAS (${totalAnomalies} fallos)</strong><br>DENEGAR NUEVO SERVICIO / DEVOLVER PAQUETE A REMITENTE SI NO RECIBE DÍA 1.`;
+        } else if (totalPending >= 4) {
+          riskBanner.className = 'risk-banner risk-medium';
+          riskBanner.innerHTML = `⚠️ <strong>EXCESO DE RESGUARDOS ACUMULADOS (${totalPending} días)</strong><br>Cliente abusa de la opción de resguardo. Notificar que no se aceptarán más resguardos.`;
+        } else {
+          riskBanner.className = 'risk-banner risk-low';
+          riskBanner.innerHTML = `🟢 <strong>CLIENTE DENTRO DE LÍMITES PERMITIDOS</strong><br>Cuenta con historial aceptable de entregas.`;
+        }
+      } else {
+        riskBanner.style.display = 'none';
+      }
+
+      const body = document.getElementById('searchResultsBody');
+      body.innerHTML = '';
+      if(filtered.length === 0) {
+        body.innerHTML = `<tr><td colspan="3" class="empty-message">No se encontraron coincidencias.</td></tr>`;
+      } else {
+        filtered.forEach(pkg => {
+          let badgeClass = pkg.status === 'Entregado' ? 'badge-entregado' : (pkg.status === 'Anomalía' ? 'badge-anomalia' : 'badge-resguardo');
+          
+          let actionBtn = '';
+          let photoBtnHtml = '';
+
+          if (pkg.status !== 'Entregado') {
+            actionBtn = `<button class="btn-action" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}')">Firmar / Entregar</button>`;
+            if (pkg.evidencePhoto) {
+              photoBtnHtml = `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button>`;
+            }
+          } else {
+            actionBtn = `<span style="color:#16a34a; font-weight:bold; font-size:0.75rem;">✅ Entregado</span>`;
+            if (pkg.evidencePhoto) {
+              photoBtnHtml = `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button> <button class="btn-upload-photo" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}', true)">✏️ Cambiar Foto</button>`;
+            } else {
+              photoBtnHtml = `<br><button class="btn-upload-photo" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}', true)">📷 Subir Foto</button>`;
+            }
+          }
+
+          let datesHtml = `<small style="color:#475569;"><strong>Ingreso:</strong> ${formatDate(pkg.entryDate)}</small>`;
+          if (pkg.status === 'Entregado') {
+            datesHtml += `<br><small style="color:#16a34a; font-weight:bold;"><strong>Entregado:</strong> ${formatDate(pkg.signedDate)}</small>`;
+          } else {
+            datesHtml += `<br><small style="color:#b45309;"><strong>Resguardo:</strong> ${calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite)}</small>`;
+          }
+
+          body.innerHTML += `
+            <tr class="search-row-clickable" onclick="scrollToPackage('${pkg.firebaseKey}')">
+              <td><strong>${pkg.person}</strong><br><small style="color:#64748b">${pkg.tracking}</small>${photoBtnHtml}</td>
+              <td>${datesHtml}</td>
+              <td style="white-space: nowrap;">
+                <span class="badge ${badgeClass}" style="margin-bottom: 4px;">${pkg.status}</span><br>
+                <button class="btn-edit" onclick="event.stopPropagation(); openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
+                ${actionBtn}
+                <button class="btn-delete" onclick="event.stopPropagation(); deleteRecord('${pkg.firebaseKey}')">🗑️ Borrar</button>
+              </td>
+            </tr>
+          `;
+        });
+      }
     }
 
     function getParsedTrackings() {
@@ -770,8 +871,10 @@
       document.getElementById('personName').value = client.person;
       if (client.altPhone) document.getElementById('altPhone').value = client.altPhone;
       
-      document.getElementById('phoneSuggestions').style.display = 'none';
-      document.getElementById('nameSuggestions').style.display = 'none';
+      const pSugg = document.getElementById('phoneSuggestions');
+      const nSugg = document.getElementById('nameSuggestions');
+      if(pSugg) pSugg.style.display = 'none';
+      if(nSugg) nSugg.style.display = 'none';
 
       const hasIndefiniteHistory = packages.some(p => 
         (p.phone === client.phone || (client.person && p.person && p.person.toLowerCase() === client.person.toLowerCase())) && p.isIndefinite === true
@@ -1103,105 +1206,6 @@
         `;
         tbody.appendChild(tr);
       });
-    }
-
-    function debouncedSearchPackages() {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => {
-        searchPackages();
-      }, 300);
-    }
-
-    function searchPackages() {
-      const query = document.getElementById('searchInput').value.trim().toLowerCase();
-      const resultsContainer = document.getElementById('searchResults');
-      const riskBanner = document.getElementById('riskBanner');
-
-      if (!query) { 
-        resultsContainer.style.display = 'none'; 
-        riskBanner.style.display = 'none';
-        return; 
-      }
-
-      const filtered = packages.filter(p => 
-        p.person.toLowerCase().includes(query) ||
-        p.phone.toLowerCase().includes(query) ||
-        (p.altPhone && p.altPhone.toLowerCase().includes(query)) ||
-        p.tracking.toLowerCase().includes(query)
-      );
-
-      resultsContainer.style.display = 'block';
-
-      const totalAnomalies = filtered.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
-      const totalPending = filtered.filter(p => p.status === 'Resguardado').length;
-      const totalSigned = filtered.filter(p => p.status === 'Entregado').length;
-
-      document.getElementById('statAnomalies').textContent = totalAnomalies;
-      document.getElementById('statPending').textContent = totalPending;
-      document.getElementById('statSigned').textContent = totalSigned;
-
-      if (filtered.length > 0) {
-        riskBanner.style.display = 'block';
-        if (totalAnomalies >= 3) {
-          riskBanner.className = 'risk-banner risk-high';
-          riskBanner.innerHTML = `🚨 <strong>CLIENTE CRÍTICO EN ANOMALÍAS (${totalAnomalies} fallos)</strong><br>DENEGAR NUEVO SERVICIO / DEVOLVER PAQUETE A REMITENTE SI NO RECIBE DÍA 1.`;
-        } else if (totalPending >= 4) {
-          riskBanner.className = 'risk-banner risk-medium';
-          riskBanner.innerHTML = `⚠️ <strong>EXCESO DE RESGUARDOS ACUMULADOS (${totalPending} días)</strong><br>Cliente abusa de la opción de resguardo. Notificar que no se aceptarán más resguardos.`;
-        } else {
-          riskBanner.className = 'risk-banner risk-low';
-          riskBanner.innerHTML = `🟢 <strong>CLIENTE DENTRO DE LÍMITES PERMITIDOS</strong><br>Cuenta con historial aceptable de entregas.`;
-        }
-      } else {
-        riskBanner.style.display = 'none';
-      }
-
-      const body = document.getElementById('searchResultsBody');
-      body.innerHTML = '';
-      if(filtered.length === 0) {
-        body.innerHTML = `<tr><td colspan="3" class="empty-message">No se encontraron coincidencias.</td></tr>`;
-      } else {
-        filtered.forEach(pkg => {
-          let badgeClass = pkg.status === 'Entregado' ? 'badge-entregado' : (pkg.status === 'Anomalía' ? 'badge-anomalia' : 'badge-resguardo');
-          
-          let actionBtn = '';
-          let photoBtnHtml = '';
-
-          if (pkg.status !== 'Entregado') {
-            actionBtn = `<button class="btn-action" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}')">Firmar / Entregar</button>`;
-            if (pkg.evidencePhoto) {
-              photoBtnHtml = `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button>`;
-            }
-          } else {
-            actionBtn = `<span style="color:#16a34a; font-weight:bold; font-size:0.75rem;">✅ Entregado</span>`;
-            if (pkg.evidencePhoto) {
-              photoBtnHtml = `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button> <button class="btn-upload-photo" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}', true)">✏️ Cambiar Foto</button>`;
-            } else {
-              photoBtnHtml = `<br><button class="btn-upload-photo" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}', true)">📷 Subir Foto</button>`;
-            }
-          }
-
-          let datesHtml = `<small style="color:#475569;"><strong>Ingreso:</strong> ${formatDate(pkg.entryDate)}</small>`;
-          if (pkg.status === 'Entregado') {
-            datesHtml += `<br><small style="color:#16a34a; font-weight:bold;"><strong>Entregado:</strong> ${formatDate(pkg.signedDate)}</small>`;
-          } else {
-            datesHtml += `<br><small style="color:#b45309;"><strong>Resguardo:</strong> ${calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite)}</small>`;
-          }
-
-          body.innerHTML += `
-            <tr class="search-row-clickable" onclick="scrollToPackage('${pkg.firebaseKey}')">
-              <td><strong>${pkg.person}</strong><br><small style="color:#64748b">${pkg.tracking}</small>${photoBtnHtml}</td>
-              <td>${datesHtml}</td>
-              <td style="white-space: nowrap;">
-                <span class="badge ${badgeClass}" style="margin-bottom: 4px;">${pkg.status}</span><br>
-                <button class="btn-edit" onclick="event.stopPropagation(); openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
-                ${actionBtn}
-                <button class="btn-delete" onclick="event.stopPropagation(); deleteRecord('${pkg.firebaseKey}')">🗑️ Borrar</button>
-              </td>
-            </tr>
-          `;
-        });
-      }
     }
 
     function scrollToPackage(key) {
