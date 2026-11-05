@@ -220,7 +220,7 @@
       <div class="card">
         <h2>🔍 Buscador General</h2>
         <div class="form-group">
-          <input type="text" id="searchInput" placeholder="Escribe nombre, teléfono o # guía..." oninput="debouncedSearchPackages()">
+          <input type="text" id="searchInput" placeholder="Escribe nombre, teléfono o # guía..." oninput="searchPackages()">
         </div>
 
         <div id="searchResults" style="display: none;">
@@ -474,7 +474,6 @@
     const db = firebase.database();
     let packages = [];
     let scannedPhysicalTrackings = new Set();
-    let searchTimeout = null;
 
     // ===== SERVICE WORKER =====
     if ('serviceWorker' in navigator) {
@@ -541,13 +540,6 @@
         searchPackages();
         generateClientReport();
       });
-    }
-
-    function debouncedSearchPackages() {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => {
-        searchPackages();
-      }, 150);
     }
 
     function searchPackages() {
