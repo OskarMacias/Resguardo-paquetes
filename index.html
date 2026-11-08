@@ -458,7 +458,7 @@
   </div>
 
   <script>
-    // Credenciales de Firebase y conexión con base de datos real
+    // Credenciales de Firebase y conexión al nodo correcto 'paquetes'
     const firebaseConfig = {
       apiKey: "AIzaSyBnRRdSKC6v4LV0b9rTmyI1c9P-_A-sP-o",
       authDomain: "resguardo-paquetes.firebaseapp.com",
@@ -528,7 +528,7 @@
     });
 
     function listenToFirebase() {
-      db.ref('packages').on('value', (snapshot) => {
+      db.ref('paquetes').on('value', (snapshot) => {
         const data = snapshot.val();
         packages = [];
         if (data) {
@@ -972,7 +972,7 @@
           signedDate: status === 'Entregado' ? entryDate : null,
           evidencePhoto: photoBase64 || null
         };
-        db.ref('packages').push(newPackage);
+        db.ref('paquetes').push(newPackage);
       });
 
       document.getElementById('trackingNum').value = '';
@@ -999,7 +999,7 @@
           const importedPackages = JSON.parse(e.target.result);
           if (Array.isArray(importedPackages)) {
             importedPackages.forEach(pkg => {
-              db.ref('packages').push(pkg);
+              db.ref('paquetes').push(pkg);
             });
             alert('¡Todos tus datos han sido cargados a la Nube con éxito!');
           }
@@ -1042,7 +1042,7 @@
         entryDate: document.getElementById('editEntryDate').value
       };
 
-      db.ref('packages/' + key).update(updatedData, (error) => {
+      db.ref('paquetes/' + key).update(updatedData, (error) => {
         if (!error) closeEditModal();
         else alert('Error al actualizar los datos');
       });
@@ -1077,7 +1077,7 @@
         updatePayload.evidencePhoto = photoBase64;
       }
 
-      db.ref('packages/' + key).update(updatePayload, (err) => {
+      db.ref('paquetes/' + key).update(updatePayload, (err) => {
         if (!err) closeDeliverModal();
         else alert('Error al actualizar entrega.');
       });
@@ -1101,7 +1101,7 @@
 
     function deleteRecord(key) {
       if (confirm('⚠️ ¿Deseas eliminar este registro de la base de datos?')) {
-        db.ref('packages/' + key).remove((error) => {
+        db.ref('paquetes/' + key).remove((error) => {
           if (error) alert('Error al eliminar el registro.');
         });
       }
