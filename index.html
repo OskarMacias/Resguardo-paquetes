@@ -458,7 +458,6 @@
   </div>
 
   <script>
-    // Credenciales de Firebase y conexión al nodo correcto 'packages'
     const firebaseConfig = {
       apiKey: "AIzaSyBnRRdSKC6v4LV0b9rTmyI1c9P-_A-sP-o",
       authDomain: "resguardo-paquetes.firebaseapp.com",
@@ -474,8 +473,8 @@
     const db = firebase.database();
     let packages = [];
     let scannedPhysicalTrackings = new Set();
+    let searchTimeout = null;
 
-    // ===== SERVICE WORKER =====
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
@@ -484,7 +483,6 @@
       });
     }
 
-    // ===== BANNER INSTALACIÓN PWA =====
     let deferredPrompt = null;
     const installBanner = document.getElementById('installBanner');
     const installBtn = document.getElementById('installBtn');
@@ -537,12 +535,19 @@
           });
         }
         renderTables();
-        searchPackages();
+        executeSearch();
         generateClientReport();
       });
     }
 
     function searchPackages() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        executeSearch();
+      }, 200);
+    }
+
+    function executeSearch() {
       const query = document.getElementById('searchInput').value.trim().toLowerCase();
       const resultsContainer = document.getElementById('searchResults');
       const riskBanner = document.getElementById('riskBanner');
@@ -559,6 +564,17 @@
         (p.altPhone && p.altPhone.toLowerCase().includes(query)) ||
         (p.tracking && p.tracking.toLowerCase().includes(query))
       );
+
+      // ORDENAR: Primero Resguardos y Anomalías (no entregados), al final los Entregados
+      filtered.sort((a, b) => {
+        const aIsDelivered = a.status === 'Entregado' ? 1 : 0;
+        const bIsDelivered = b.status === 'Entregado' ? 1 : 0;
+        if (aIsDelivered !== bIsDelivered) {
+          return aIsDelivered - bIsDelivered; // Los 0 (no entregados) van primero
+        }
+        // Si tienen el mismo estado, se ordenan del más reciente al más antiguo
+        return new Date(b.entryDate || b.id) - new Date(a.entryDate || a.id);
+      });
 
       resultsContainer.style.display = 'block';
 
@@ -591,7 +607,8 @@
       if(filtered.length === 0) {
         body.innerHTML = `<tr><td colspan="3" class="empty-message">No se encontraron coincidencias.</td></tr>`;
       } else {
-        filtered.forEach(pkg => {
+        const limitedFiltered = filtered.slice(0, 50);
+        limitedFiltered.forEach(pkg => {
           let badgeClass = pkg.status === 'Entregado' ? 'badge-entregado' : (pkg.status === 'Anomalía' ? 'badge-anomalia' : 'badge-resguardo');
           
           let actionBtn = '';
