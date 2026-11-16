@@ -268,8 +268,8 @@
           </div>
 
           <div class="form-group" id="trackingGroup">
-            <label>Número(s) de Guía <small style="color:#2563eb; font-weight:normal;">(Separa varias guías con comas o saltos de línea)</small></label>
-            <textarea id="trackingNum" placeholder="Ej: JMX101, JMX102, JMX103..." oninput="updateTrackingPreview()"></textarea>
+            <label>Número(s) de Guía <small style="color:#2563eb; font-weight:normal;">(Debe iniciar con JMX + 12 números)</small></label>
+            <textarea id="trackingNum" placeholder="Ej: JMX101853945903..." oninput="updateTrackingPreview()"></textarea>
             <div id="trackingPreview" style="margin-top: 4px;"></div>
           </div>
 
@@ -313,12 +313,18 @@
       <div class="card" style="border-left: 4px solid #0284c7;">
         <h2>🔍 Control de Inventario / Auditoría Física</h2>
         <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">
-          Escanea o ingresa las guías que físicamente tienes en el estante. El sistema las clasificará en 3 grupos automáticamente.
+          Escanea o ingresa las guías (Formato: JMX + 12 números). Puedes respaldar o pegar tu lista completa para no perderla.
         </p>
         
         <div class="form-group" style="display: flex; gap: 8px;">
-          <input type="text" id="inventoryScanInput" placeholder="Escanea o escribe guía física..." onkeypress="if(event.key==='Enter'){addPhysicalItem(); event.preventDefault();}">
+          <input type="text" id="inventoryScanInput" placeholder="Escanea o escribe guía (Ej: JMX101853945903)..." onkeypress="if(event.key==='Enter'){addPhysicalItem(); event.preventDefault();}">
           <button type="button" onclick="addPhysicalItem()" style="width: 120px; background-color: #0284c7;">➕ Agregar</button>
+        </div>
+
+        <!-- Opciones de Respaldo / Pegar en bloque -->
+        <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
+          <button type="button" onclick="copyInventoryBackup()" style="background-color: #0d9488; font-size: 0.8rem; padding: 6px 10px; width: auto;">📋 Copiar Guías Escaneadas</button>
+          <button type="button" onclick="openPasteModal()" style="background-color: #7c3aed; font-size: 0.8rem; padding: 6px 10px; width: auto;">📥 Pegar Bloque de Guías</button>
         </div>
 
         <div id="scannedChipsContainer" style="margin-bottom: 10px; min-height: 35px; border: 1px dashed var(--border); padding: 6px; border-radius: 6px;">
@@ -422,15 +428,30 @@
   </div>
 
   <!-- Modal para Adjuntar Foto -->
-  <div id="deliverModal" class="modal" onkeydown="if(event.key==='Enter'){ confirmDeliveryWithPhoto(); event.preventDefault(); }">
+  <div id="deliverModal" class="modal">
     <div class="modal-content">
-      <div class="modal-header" id="deliverModalTitle">✍️ Firmar y Adjuntar Evidencia de Entrega</div>
+      <div class="modal-header" id="deliverModalTitle">📷 Evidencia de Entrega</div>
       <input type="hidden" id="deliverKey">
       <div class="form-group"><label>Foto / Captura de Evidencia (Galería o Cámara)</label><input type="file" id="deliverPhotoInput" accept="image/*"></div>
-      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Presiona Enter en tu teclado para guardar de inmediato sin foto.</em></p>
+      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Presiona Enter en tu teclado para entregar de inmediato sin foto.</em></p>
       <div class="modal-actions">
-        <button type="button" onclick="confirmDeliveryWithPhoto()">Guardar Foto</button>
+        <button type="button" onclick="confirmDeliveryWithPhoto()">Entregar</button>
         <button type="button" class="btn-cancel" onclick="closeDeliverModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Pegar Guías en Bloque -->
+  <div id="pasteModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">📥 Pegar Bloque de Guías (Inventario)</div>
+      <p style="font-size:0.8rem; color:#64748b; margin-bottom:8px;">Pega aquí tu lista de guías (separadas por comas, espacios o saltos de línea):</p>
+      <div class="form-group">
+        <textarea id="pasteTrackingsText" rows="6" placeholder="JMX101853945903, JMX601086349658..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" onclick="processPastedTrackings()">Procesar y Agregar</button>
+        <button type="button" class="btn-cancel" onclick="closePasteModal()">Cancelar</button>
       </div>
     </div>
   </div>
@@ -517,6 +538,23 @@
       setDefaultReportDates();
       listenToFirebase();
 
+      const savedInventory = localStorage.getItem('scannedPhysicalTrackings');
+      if (savedInventory) {
+        try {
+          const arr = JSON.parse(savedInventory);
+          arr.forEach(t => scannedPhysicalTrackings.add(t));
+          renderScannedChips();
+        } catch(e) {}
+      }
+
+      const deliverModal = document.getElementById('deliverModal');
+      deliverModal.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          confirmDeliveryWithPhoto();
+        }
+      });
+
       document.addEventListener('click', (e) => {
         if (!e.target.closest('.form-group')) {
           const pSugg = document.getElementById('phoneSuggestions');
@@ -526,6 +564,10 @@
         }
       });
     });
+
+    function saveInventoryToLocalStorage() {
+      localStorage.setItem('scannedPhysicalTrackings', JSON.stringify(Array.from(scannedPhysicalTrackings)));
+    }
 
     function listenToFirebase() {
       db.ref('packages').on('value', (snapshot) => {
@@ -540,11 +582,16 @@
         executeSearch();
         generateClientReport();
         
-        // Si la auditoría ya estaba abierta, la recalculamos en vivo al sincronizar
         if (document.getElementById('auditResults').style.display === 'block') {
           processInventoryAudit();
         }
       });
+    }
+
+    function validateTrackingFormat(tracking) {
+      const clean = tracking.trim().toUpperCase();
+      const regex = /^JMX\d{12}$/;
+      return { isValid: regex.test(clean), cleaned: clean };
     }
 
     function searchPackages() {
@@ -620,7 +667,7 @@
           let photoBtnHtml = '';
 
           if (pkg.status !== 'Entregado') {
-            actionBtn = `<button class="btn-action" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}')">Firmar / Entregar</button>`;
+            actionBtn = `<button class="btn-action" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}')">Entregar</button>`;
             if (pkg.evidencePhoto) {
               photoBtnHtml = `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button>`;
             }
@@ -685,15 +732,32 @@
 
     function addPhysicalItem() {
       const input = document.getElementById('inventoryScanInput');
-      const val = input.value.trim().toLowerCase();
-      if (!val) return;
+      const rawVal = input.value.trim();
+      if (!rawVal) return;
+
+      const validation = validateTrackingFormat(rawVal);
+      if (!validation.isValid) {
+        alert(`⚠️ Guía inválida ("${rawVal}").\nDebe iniciar estrictamente con "JMX" seguido exactamente de 12 números (Ej: JMX101853945903). Faltan números o caracteres.`);
+        input.value = '';
+        return;
+      }
+
+      const val = validation.cleaned;
+      if (scannedPhysicalTrackings.has(val)) {
+        alert(`⚠️ Esta guía (${val}) ya la agregaste a la revisión física.`);
+        input.value = '';
+        return;
+      }
+
       scannedPhysicalTrackings.add(val);
+      saveInventoryToLocalStorage();
       input.value = '';
       renderScannedChips();
     }
 
     function removePhysicalItem(tracking) {
       scannedPhysicalTrackings.delete(tracking);
+      saveInventoryToLocalStorage();
       renderScannedChips();
     }
 
@@ -707,15 +771,73 @@
       scannedPhysicalTrackings.forEach(track => {
         const chip = document.createElement('span');
         chip.className = 'inventory-chip';
-        chip.innerHTML = `${track.toUpperCase()} <span class="remove-chip" onclick="removePhysicalItem('${track}')">✕</span>`;
+        chip.innerHTML = `${track} <span class="remove-chip" onclick="removePhysicalItem('${track}')">✕</span>`;
         container.appendChild(chip);
       });
     }
 
     function clearInventoryAudit() {
-      scannedPhysicalTrackings.clear();
+      if (confirm('¿Deseas limpiar todas las guías escaneadas del control de inventario?')) {
+        scannedPhysicalTrackings.clear();
+        localStorage.removeItem('scannedPhysicalTrackings');
+        renderScannedChips();
+        document.getElementById('auditResults').style.display = 'none';
+      }
+    }
+
+    function copyInventoryBackup() {
+      if (scannedPhysicalTrackings.size === 0) {
+        alert('No hay guías escaneadas para copiar.');
+        return;
+      }
+      const textToCopy = Array.from(scannedPhysicalTrackings).join('\n');
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        alert('¡Todas las guías escaneadas fueron copiadas al portapapeles con éxito!');
+      }).catch(err => {
+        alert('Error al copiar al portapapeles.');
+      });
+    }
+
+    function openPasteModal() {
+      document.getElementById('pasteTrackingsText').value = '';
+      document.getElementById('pasteModal').style.display = 'flex';
+    }
+
+    function closePasteModal() {
+      document.getElementById('pasteModal').style.display = 'none';
+    }
+
+    function processPastedTrackings() {
+      const rawText = document.getElementById('pasteTrackingsText').value;
+      if (!rawText) {
+        closePasteModal();
+        return;
+      }
+
+      const items = rawText.split(/[\n,;\s]+/).map(t => t.trim()).filter(t => t.length > 0);
+      let addedCount = 0;
+      let invalidCount = 0;
+      let duplicateCount = 0;
+
+      items.forEach(item => {
+        const val = item.toUpperCase();
+        const validation = validateTrackingFormat(val);
+        if (!validation.isValid) {
+          invalidCount++;
+          return;
+        }
+        if (scannedPhysicalTrackings.has(validation.cleaned)) {
+          duplicateCount++;
+          return;
+        }
+        scannedPhysicalTrackings.add(validation.cleaned);
+        addedCount++;
+      });
+
+      saveInventoryToLocalStorage();
       renderScannedChips();
-      document.getElementById('auditResults').style.display = 'none';
+      closePasteModal();
+      alert(`Resultados de importación:\n✅ Agregadas: ${addedCount}\n⚠️ Duplicadas omitidas: ${duplicateCount}\n❌ Inválidas (no inician con JMX o faltan números): ${invalidCount}`);
     }
 
     function processInventoryAudit() {
@@ -731,8 +853,8 @@
       unregisteredTbody.innerHTML = '';
 
       const activeResguardoInSystem = packages.filter(p => p.status === 'Resguardado');
-      const systemTrackingsSet = new Set(activeResguardoInSystem.map(p => (p.tracking || '').toLowerCase()));
-      const allRegisteredTrackingsSet = new Set(packages.map(p => (p.tracking || '').toLowerCase()));
+      const systemTrackingsSet = new Set(activeResguardoInSystem.map(p => (p.tracking || '').toUpperCase()));
+      const allRegisteredTrackingsSet = new Set(packages.map(p => (p.tracking || '').toUpperCase()));
 
       let matchedCount = 0;
       let unregisteredTrackings = [];
@@ -746,7 +868,7 @@
       });
 
       const missingPhysical = activeResguardoInSystem.filter(p => {
-        const track = (p.tracking || '').toLowerCase();
+        const track = (p.tracking || '').toUpperCase();
         return !scannedPhysicalTrackings.has(track);
       });
 
@@ -759,7 +881,7 @@
         unregisteredTrackings.forEach(track => {
           unregisteredTbody.innerHTML += `
             <tr>
-              <td><strong>${track.toUpperCase()}</strong></td>
+              <td><strong>${track}</strong></td>
               <td><span class="badge badge-anomalia">No registrado</span></td>
               <td>
                 <button class="btn-edit" onclick="prefillRegisterForm('${track}')">➕ Registrar en Sistema</button>
@@ -791,7 +913,7 @@
     }
 
     function prefillRegisterForm(tracking) {
-      document.getElementById('trackingNum').value = tracking.toUpperCase();
+      document.getElementById('trackingNum').value = tracking;
       updateTrackingPreview();
       document.getElementById('trackingNum').focus();
       document.getElementById('packageForm').scrollIntoView({ behavior: 'smooth' });
@@ -948,21 +1070,31 @@
       const status = document.getElementById('status').value;
       const trackings = getParsedTrackings();
 
-      if (trackings.length === 0 && status !== 'Anomalía') {
-        trackings.push('S/N-' + Date.now().toString().slice(-4));
-      } else if (trackings.length === 0 && status === 'Anomalía') {
-        trackings.push('');
+      if (status !== 'Anomalía') {
+        if (trackings.length === 0) {
+          alert('Debes ingresar al menos un número de guía.');
+          return;
+        }
+        for (let t of trackings) {
+          const validation = validateTrackingFormat(t);
+          if (!validation.isValid) {
+            alert(`⚠️ La guía "${t}" no es válida.\nDebe iniciar estrictamente con "JMX" seguido de exactamente 12 números (Ej: JMX101853945903). Faltan números o caracteres.`);
+            return;
+          }
+        }
       }
 
+      const cleanTrackings = trackings.map(t => validateTrackingFormat(t).cleaned);
+
       const existingTrackings = [];
-      trackings.forEach(t => {
-        if (t && packages.some(p => p.tracking && p.tracking.toLowerCase() === t.toLowerCase())) {
+      cleanTrackings.forEach(t => {
+        if (t && packages.some(p => p.tracking && p.tracking.toUpperCase() === t)) {
           existingTrackings.push(t);
         }
       });
 
       if (existingTrackings.length > 0) {
-        alert(`⚠️ Las siguientes guías ya están registradas:\n${existingTrackings.join(', ')}`);
+        alert(`⚠️ Las siguientes guías ya están registradas en el sistema:\n${existingTrackings.join(', ')}`);
         return;
       }
 
@@ -980,7 +1112,9 @@
       const description = document.getElementById('description').value.trim() || '---';
       const isIndefinite = status === 'Resguardado' ? document.getElementById('isIndefinite').checked : false;
 
-      trackings.forEach((t, idx) => {
+      const itemsToRegister = cleanTrackings.length > 0 ? cleanTrackings : [''];
+
+      itemsToRegister.forEach((t, idx) => {
         const newPackage = {
           id: Date.now() + idx,
           tracking: t || 'S/N-' + Date.now().toString().slice(-4),
@@ -1011,6 +1145,7 @@
       updateTrackingPreview();
       toggleAnomalyMode();
       setCurrentDate();
+      alert('¡Registro(s) guardado(s) exitosamente!');
     });
 
     function importDataToFirebase(event) {
@@ -1056,8 +1191,15 @@
       const key = document.getElementById('editKey').value;
       if (!key) return;
 
+      const trackingVal = document.getElementById('editTracking').value.trim();
+      const validation = validateTrackingFormat(trackingVal);
+      if (!validation.isValid && !trackingVal.startsWith('S/N-')) {
+        alert('⚠️ La guía editada debe iniciar con JMX seguido de 12 números.');
+        return;
+      }
+
       const updatedData = {
-        tracking: document.getElementById('editTracking').value.trim(),
+        tracking: validation.isValid ? validation.cleaned : trackingVal,
         person: document.getElementById('editPerson').value.trim(),
         phone: document.getElementById('editPhone').value.trim(),
         altPhone: document.getElementById('editAltPhone').value.trim(),
@@ -1075,7 +1217,7 @@
     function markAsDelivered(key, isDeliveredUpdate = false) {
       document.getElementById('deliverKey').value = key;
       document.getElementById('deliverPhotoInput').value = '';
-      document.getElementById('deliverModalTitle').textContent = isDeliveredUpdate ? "📷 Adjuntar / Actualizar Foto de Evidencia" : "✍️ Firmar y Adjuntar Evidencia de Entrega";
+      document.getElementById('deliverModalTitle').textContent = isDeliveredUpdate ? "📷 Adjuntar / Actualizar Foto de Evidencia" : "📦 Entregar Paquete";
       document.getElementById('deliverModal').style.display = 'flex';
     }
 
@@ -1104,7 +1246,6 @@
       db.ref('packages/' + key).update(updatePayload, (err) => {
         if (!err) {
           closeDeliverModal();
-          // Actualizar inmediatamente la auditoría física si está visible
           if (document.getElementById('auditResults').style.display === 'block') {
             processInventoryAudit();
           }
@@ -1239,7 +1380,7 @@
           <td>${daysDisplay}</td>
           <td style="white-space: nowrap;">
             <button class="btn-edit" onclick="openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
-            <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">Firmar / Entregar</button>
+            <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">Entregar</button>
           </td>
         `;
         tbody.appendChild(tr);
