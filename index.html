@@ -348,8 +348,9 @@
           </div>
 
           <div id="missingAuditContainer" style="display: none; margin-bottom: 10px;">
-            <div class="section-subtitle" style="border-left-color: #dc2626; color: #991b1b;">
-              ⚠️ Paquetes Faltantes en Físico (Entregados sin marcar salida):
+            <div class="section-subtitle" style="border-left-color: #dc2626; color: #991b1b; display: flex; justify-content: space-between; align-items: center;">
+              <span>⚠️ Paquetes Faltantes en Físico (Entregados sin marcar salida):</span>
+              <span id="missingCountBadge" style="background: #dc2626; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;">0</span>
             </div>
             <div style="overflow-x: auto; max-height: 200px; overflow-y: auto;">
               <table>
@@ -421,11 +422,12 @@
   </div>
 
   <!-- Modal para Adjuntar Foto -->
-  <div id="deliverModal" class="modal">
+  <div id="deliverModal" class="modal" onkeydown="if(event.key==='Enter'){ confirmDeliveryWithPhoto(); event.preventDefault(); }">
     <div class="modal-content">
       <div class="modal-header" id="deliverModalTitle">✍️ Firmar y Adjuntar Evidencia de Entrega</div>
       <input type="hidden" id="deliverKey">
       <div class="form-group"><label>Foto / Captura de Evidencia (Galería o Cámara)</label><input type="file" id="deliverPhotoInput" accept="image/*"></div>
+      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Presiona Enter en tu teclado para guardar de inmediato sin foto.</em></p>
       <div class="modal-actions">
         <button type="button" onclick="confirmDeliveryWithPhoto()">Guardar Foto</button>
         <button type="button" class="btn-cancel" onclick="closeDeliverModal()">Cancelar</button>
@@ -537,6 +539,11 @@
         renderTables();
         executeSearch();
         generateClientReport();
+        
+        // Si la auditoría ya estaba abierta, la recalculamos en vivo al sincronizar
+        if (document.getElementById('auditResults').style.display === 'block') {
+          processInventoryAudit();
+        }
       });
     }
 
@@ -565,14 +572,12 @@
         (p.tracking && p.tracking.toLowerCase().includes(query))
       );
 
-      // ORDENAR: Primero Resguardos y Anomalías (no entregados), al final los Entregados
       filtered.sort((a, b) => {
         const aIsDelivered = a.status === 'Entregado' ? 1 : 0;
         const bIsDelivered = b.status === 'Entregado' ? 1 : 0;
         if (aIsDelivered !== bIsDelivered) {
-          return aIsDelivered - bIsDelivered; // Los 0 (no entregados) van primero
+          return aIsDelivered - bIsDelivered; 
         }
-        // Si tienen el mismo estado, se ordenan del más reciente al más antiguo
         return new Date(b.entryDate || b.id) - new Date(a.entryDate || a.id);
       });
 
@@ -718,6 +723,7 @@
       const countMatchedEl = document.getElementById('countMatched');
       const missingContainer = document.getElementById('missingAuditContainer');
       const missingTbody = document.getElementById('missingAuditTableBody');
+      const missingCountBadge = document.getElementById('missingCountBadge');
       const unregisteredContainer = document.getElementById('unregisteredAuditContainer');
       const unregisteredTbody = document.getElementById('unregisteredAuditTableBody');
 
@@ -746,6 +752,7 @@
 
       resultsContainer.style.display = 'block';
       countMatchedEl.textContent = `${matchedCount} paquete(s)`;
+      missingCountBadge.textContent = missingPhysical.length;
 
       if (unregisteredTrackings.length > 0) {
         unregisteredContainer.style.display = 'block';
@@ -1095,8 +1102,15 @@
       }
 
       db.ref('packages/' + key).update(updatePayload, (err) => {
-        if (!err) closeDeliverModal();
-        else alert('Error al actualizar entrega.');
+        if (!err) {
+          closeDeliverModal();
+          // Actualizar inmediatamente la auditoría física si está visible
+          if (document.getElementById('auditResults').style.display === 'block') {
+            processInventoryAudit();
+          }
+        } else {
+          alert('Error al actualizar entrega.');
+        }
       });
     }
 
@@ -1129,29 +1143,44 @@
       return new Date(dateStr).toLocaleString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
-    function getClientTotals(phone) {
-      const clientPkgs = packages.filter(p => p.phone === phone);
-      const deliveredCount = clientPkgs.filter(p => p.status === 'Entregado').length;
-      const anomalyCount = clientPkgs.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
+    function formatPhoneDisplay(pkg) {
+      const clientPkgs = packages.filter(p => 
+        (p.phone && pkg.phone && p.phone === pkg.phone) || 
+        (p.person && pkg.person && p.person.toLowerCase() === pkg.person.toLowerCase())
+      );
+
+      const phonesSet = new Set();
+      const altPhonesSet = new Set();
+      
+      clientPkgs.forEach(p => {
+        if (p.phone) phonesSet.add(p.phone);
+        if (p.altPhone) altPhonesSet.add(p.altPhone);
+      });
+      if (pkg.phone) phonesSet.add(pkg.phone);
+      if (pkg.altPhone) altPhonesSet.add(pkg.altPhone);
+
+      const primaryPhonesArr = Array.from(phonesSet);
+      const altPhonesArr = Array.from(altPhonesSet);
+
+      const mainPhone = primaryPhonesArr[0] || pkg.phone || '---';
+      const extraPhones = primaryPhonesArr.slice(1);
+      const allAlts = [...altPhonesArr, ...extraPhones].filter(tp => tp !== mainPhone);
+
+      const deliveredCount = packages.filter(p => p.person && pkg.person && p.person.toLowerCase() === pkg.person.toLowerCase() && p.status === 'Entregado').length;
+      const anomalyCount = packages.filter(p => p.person && pkg.person && p.person.toLowerCase() === pkg.person.toLowerCase() && (p.status === 'Anomalía' || p.anomalyDate)).length;
 
       const resguardoDates = new Set();
-      clientPkgs.forEach(p => {
-        if (p.status === 'Resguardado' && p.entryDate) {
-          const dateOnly = p.entryDate.slice(0, 10);
-          resguardoDates.add(dateOnly);
+      packages.forEach(p => {
+        if (p.person && pkg.person && p.person.toLowerCase() === pkg.person.toLowerCase() && p.status === 'Resguardado' && p.entryDate) {
+          resguardoDates.add(p.entryDate.slice(0, 10));
         }
       });
-
       const resguardoCount = resguardoDates.size;
-      const totalPkgs = clientPkgs.length;
 
-      return { deliveredCount, resguardoCount, anomalyCount, totalPkgs };
-    }
-
-    function formatPhoneDisplay(pkg) {
-      const { deliveredCount, resguardoCount, anomalyCount } = getClientTotals(pkg.phone);
-      let html = `<small style="color:#64748b">${pkg.phone}</small>`;
-      if (pkg.altPhone) html += `<br><small style="color:#2563eb; font-weight:bold;">Alt: ${pkg.altPhone}</small>`;
+      let html = `<small style="color:#64748b">📱 Tel: ${mainPhone}</small>`;
+      if (allAlts.length > 0) {
+        html += `<br><small style="color:#2563eb; font-weight:bold;">📞 Otro(s): ${allAlts.join(', ')}</small>`;
+      }
       html += `<span class="client-stats">✅ ${deliveredCount} ent. | 📦 ${resguardoCount} día(s) resg. | 🚨 ${anomalyCount} anom.</span>`;
       return html;
     }
