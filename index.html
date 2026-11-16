@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
   <title>Control de Paquetes y Reincidencias</title>
 
   <!-- PWA y Logotipo Oficial -->
@@ -130,7 +130,7 @@
     .search-row-clickable:hover { background-color: #f1f5f9; }
 
     .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; padding: 15px; }
-    .modal-content { background-color: white; padding: 20px; border-radius: 10px; width: 100%; max-width: 500px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+    .modal-content { background-color: white; padding: 20px; border-radius: 10px; width: 100%; max-width: 500px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; outline: none; }
     .modal-header { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; color: #1e293b; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
     .modal-actions { display: flex; gap: 10px; margin-top: 15px; }
     .btn-cancel { background-color: #64748b; }
@@ -406,7 +406,7 @@
 
   <!-- Modal de Edición -->
   <div id="editModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" tabindex="-1">
       <div class="modal-header">✏️ Editar Registro de Paquete</div>
       <input type="hidden" id="editKey">
       <div class="form-group"><label>Número de Guía</label><input type="text" id="editTracking"></div>
@@ -429,8 +429,8 @@
 
   <!-- Modal para Adjuntar Foto -->
   <div id="deliverModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header" id="deliverModalTitle">📷 Evidencia de Entrega</div>
+    <div class="modal-content" tabindex="-1">
+      <div class="modal-header" id="deliverModalTitle">📦 Entregar Paquete</div>
       <input type="hidden" id="deliverKey">
       <div class="form-group"><label>Foto / Captura de Evidencia (Galería o Cámara)</label><input type="file" id="deliverPhotoInput" accept="image/*"></div>
       <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Presiona Enter en tu teclado para entregar de inmediato sin foto.</em></p>
@@ -443,7 +443,7 @@
 
   <!-- Modal para Pegar Guías en Bloque -->
   <div id="pasteModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" tabindex="-1">
       <div class="modal-header">📥 Pegar Bloque de Guías (Inventario)</div>
       <p style="font-size:0.8rem; color:#64748b; margin-bottom:8px;">Pega aquí tu lista de guías (separadas por comas, espacios o saltos de línea):</p>
       <div class="form-group">
@@ -458,7 +458,7 @@
 
   <!-- Modal para Ver Foto -->
   <div id="viewPhotoModal" class="modal">
-    <div class="modal-content" style="text-align: center;">
+    <div class="modal-content" tabindex="-1" style="text-align: center;">
       <div class="modal-header">📷 Evidencia de Entrega / Resguardo</div>
       <p style="font-size:0.75rem; color:#64748b; margin-bottom:5px;">💡 Haz clic o toca la imagen para verla en pantalla completa / hacer zoom</p>
       <img id="modalPreviewImage" class="preview-img" src="" alt="Evidencia" onclick="openLightbox(this.src)">
@@ -801,6 +801,9 @@
     function openPasteModal() {
       document.getElementById('pasteTrackingsText').value = '';
       document.getElementById('pasteModal').style.display = 'flex';
+      setTimeout(() => {
+        document.querySelector('#pasteModal .modal-content').focus();
+      }, 50);
     }
 
     function closePasteModal() {
@@ -1183,6 +1186,9 @@
       document.getElementById('editEntryDate').value = pkg.entryDate || '';
 
       document.getElementById('editModal').style.display = 'flex';
+      setTimeout(() => {
+        document.querySelector('#editModal .modal-content').focus();
+      }, 50);
     }
 
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
@@ -1219,6 +1225,11 @@
       document.getElementById('deliverPhotoInput').value = '';
       document.getElementById('deliverModalTitle').textContent = isDeliveredUpdate ? "📷 Adjuntar / Actualizar Foto de Evidencia" : "📦 Entregar Paquete";
       document.getElementById('deliverModal').style.display = 'flex';
+      
+      // Forzar el foco dentro de la ventana modal para que Enter funcione de inmediato
+      setTimeout(() => {
+        document.querySelector('#deliverModal .modal-content').focus();
+      }, 50);
     }
 
     function closeDeliverModal() { document.getElementById('deliverModal').style.display = 'none'; }
@@ -1258,6 +1269,9 @@
     function showPhotoModal(photoBase64) {
       document.getElementById('modalPreviewImage').src = photoBase64;
       document.getElementById('viewPhotoModal').style.display = 'flex';
+      setTimeout(() => {
+        document.querySelector('#viewPhotoModal .modal-content').focus();
+      }, 50);
     }
 
     function closeViewPhotoModal() { document.getElementById('viewPhotoModal').style.display = 'none'; }
