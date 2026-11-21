@@ -62,8 +62,15 @@
     button { background-color: var(--primary); color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; font-size: 0.95rem; }
     button:hover { background-color: var(--primary-hover); }
 
-    .btn-scan { background-color: #0f766e; padding: 7px 11px; font-size: 0.8rem; width: auto; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; }
+    .btn-scan { background-color: #0f766e; padding: 8px 12px; font-size: 0.82rem; width: auto; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
     .btn-scan:hover { background-color: #115e59; }
+
+    .photo-picker-row { display: flex; gap: 8px; margin-top: 6px; }
+    .btn-camera-pick { background-color: #0284c7; padding: 9px 12px; font-size: 0.85rem; flex: 1; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+    .btn-camera-pick:hover { background-color: #0369a1; }
+    .btn-gallery-pick { background-color: #7c3aed; padding: 9px 12px; font-size: 0.85rem; flex: 1; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+    .btn-gallery-pick:hover { background-color: #6d28d9; }
+    .photo-selected-status { font-size: 0.78rem; color: #15803d; font-weight: 600; margin-top: 6px; display: none; }
     
     .btn-action { padding: 6px 10px; font-size: 0.8rem; width: auto; background-color: var(--success); }
     .btn-edit { background-color: #0284c7; padding: 6px 10px; font-size: 0.8rem; width: auto; margin-right: 4px; }
@@ -226,8 +233,9 @@
       <!-- Buscador General -->
       <div class="card">
         <h2>🔍 Buscador General</h2>
-        <div class="form-group">
-          <input type="text" id="searchInput" placeholder="Escribe nombre, teléfono o # guía..." oninput="searchPackages()">
+        <div class="form-group" style="display: flex; gap: 8px; align-items: center;">
+          <input type="text" id="searchInput" style="flex: 1;" placeholder="Escribe nombre, teléfono o # guía..." oninput="searchPackages()">
+          <button type="button" class="btn-scan" onclick="openBarcodeScanner('search')">📷 Escanear</button>
         </div>
 
         <div id="searchResults" style="display: none;">
@@ -457,10 +465,16 @@
       <div class="modal-header" id="deliverModalTitle">📦 Entregar Paquete</div>
       <input type="hidden" id="deliverKey">
       <div class="form-group">
-        <label>Evidencia de Entrega (Tomar Foto o Elegir de Galería)</label>
-        <input type="file" id="deliverPhotoInput" accept="image/*">
+        <label>Evidencia de Entrega (Opcional)</label>
+        <input type="file" id="deliverCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleDeliverPhotoChange(this)">
+        <input type="file" id="deliverGalleryInput" accept="image/*" style="display: none;" onchange="handleDeliverPhotoChange(this)">
+        <div class="photo-picker-row">
+          <button type="button" class="btn-camera-pick" onclick="document.getElementById('deliverCameraInput').click()">📷 Tomar Foto</button>
+          <button type="button" class="btn-gallery-pick" onclick="document.getElementById('deliverGalleryInput').click()">🖼️ Subir Foto</button>
+        </div>
+        <div id="deliverPhotoStatus" class="photo-selected-status"></div>
       </div>
-      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Toca el selector para tomar foto o elegir de tu galería, o presiona Enter para entregar de inmediato sin foto.</em></p>
+      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Toma o sube una foto, o presiona Enter para entregar de inmediato sin foto.</em></p>
       <div class="modal-actions">
         <button type="button" onclick="confirmDeliveryWithPhoto()">Entregar</button>
         <button type="button" class="btn-cancel" onclick="closeDeliverModal()">Cancelar</button>
@@ -526,6 +540,7 @@
     let searchTimeout = null;
     let codeReader = null;
     let scannerTarget = null;
+    let activeDeliverPhotoInput = null;
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -594,6 +609,23 @@
       });
     });
 
+    function handleDeliverPhotoChange(input) {
+      const statusEl = document.getElementById('deliverPhotoStatus');
+      if (input.files && input.files[0]) {
+        activeDeliverPhotoInput = input;
+        const otherInput = input.id === 'deliverCameraInput'
+          ? document.getElementById('deliverGalleryInput')
+          : document.getElementById('deliverCameraInput');
+        otherInput.value = '';
+        statusEl.textContent = `✅ Lista: ${input.files[0].name}`;
+        statusEl.style.display = 'block';
+      } else {
+        activeDeliverPhotoInput = null;
+        statusEl.textContent = '';
+        statusEl.style.display = 'none';
+      }
+    }
+
     async function openBarcodeScanner(target) {
       scannerTarget = target;
       const modal = document.getElementById('scannerModal');
@@ -634,7 +666,11 @@
     }
 
     function applyScannedTracking(tracking) {
-      if (scannerTarget === 'register') {
+      if (scannerTarget === 'search') {
+        const searchInput = document.getElementById('searchInput');
+        searchInput.value = tracking;
+        executeSearch();
+      } else if (scannerTarget === 'register') {
         const ta = document.getElementById('trackingNum');
         const current = ta.value.trim();
         ta.value = current ? `${current}\n${tracking}` : tracking;
@@ -1136,7 +1172,7 @@
 
     function compressAndConvertImage(fileInput) {
       return new Promise((resolve) => {
-        const file = fileInput.files[0];
+        const file = fileInput && fileInput.files ? fileInput.files[0] : null;
         if (!file) { resolve(null); return; }
 
         const reader = new FileReader();
@@ -1313,7 +1349,12 @@
 
     function markAsDelivered(key, isDeliveredUpdate = false) {
       document.getElementById('deliverKey').value = key;
-      document.getElementById('deliverPhotoInput').value = '';
+      document.getElementById('deliverCameraInput').value = '';
+      document.getElementById('deliverGalleryInput').value = '';
+      activeDeliverPhotoInput = null;
+      const statusEl = document.getElementById('deliverPhotoStatus');
+      statusEl.textContent = '';
+      statusEl.style.display = 'none';
       document.getElementById('deliverModalTitle').textContent = isDeliveredUpdate ? "📷 Adjuntar / Actualizar Foto de Evidencia" : "📦 Entregar Paquete";
       document.getElementById('deliverModal').style.display = 'flex';
       
@@ -1328,7 +1369,11 @@
       const key = document.getElementById('deliverKey').value;
       if (!key) return;
 
-      const photoBase64 = await compressAndConvertImage(document.getElementById('deliverPhotoInput'));
+      const selectedInput = activeDeliverPhotoInput
+        || (document.getElementById('deliverCameraInput').files.length ? document.getElementById('deliverCameraInput') : null)
+        || (document.getElementById('deliverGalleryInput').files.length ? document.getElementById('deliverGalleryInput') : null);
+
+      const photoBase64 = await compressAndConvertImage(selectedInput);
       const pkg = packages.find(p => p.firebaseKey === key);
 
       const updatePayload = {};
