@@ -294,7 +294,7 @@
             <input type="text" id="anomalyNote" placeholder="Escribe el motivo..." style="display: none;">
           </div>
 
-          <div class="form-group"><label>Foto de Evidencia (Galería o Cámara)</label><input type="file" id="evidencePhoto" accept="image/*"></div>
+          <div class="form-group"><label>Foto de Evidencia (Cámara o Galería)</label><input type="file" id="evidencePhoto" accept="image/*" capture="environment"></div>
           <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="entryDate" required></div>
           <button type="submit" id="saveSubmitBtn">Guardar Registro</button>
         </form>
@@ -427,13 +427,16 @@
     </div>
   </div>
 
-  <!-- Modal para Adjuntar Foto -->
+  <!-- Modal para Adjuntar Foto / Entregar -->
   <div id="deliverModal" class="modal">
     <div class="modal-content" tabindex="-1">
       <div class="modal-header" id="deliverModalTitle">📦 Entregar Paquete</div>
       <input type="hidden" id="deliverKey">
-      <div class="form-group"><label>Foto / Captura de Evidencia (Galería o Cámara)</label><input type="file" id="deliverPhotoInput" accept="image/*"></div>
-      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Presiona Enter en tu teclado para entregar de inmediato sin foto.</em></p>
+      <div class="form-group">
+        <label>Tomar Foto de Evidencia (Cámara o Galería)</label>
+        <input type="file" id="deliverPhotoInput" accept="image/*" capture="environment">
+      </div>
+      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Toma la foto con la cámara o presiona Enter para entregar de inmediato sin foto.</em></p>
       <div class="modal-actions">
         <button type="button" onclick="confirmDeliveryWithPhoto()">Entregar</button>
         <button type="button" class="btn-cancel" onclick="closeDeliverModal()">Cancelar</button>
@@ -1226,7 +1229,6 @@
       document.getElementById('deliverModalTitle').textContent = isDeliveredUpdate ? "📷 Adjuntar / Actualizar Foto de Evidencia" : "📦 Entregar Paquete";
       document.getElementById('deliverModal').style.display = 'flex';
       
-      // Forzar el foco dentro de la ventana modal para que Enter funcione de inmediato
       setTimeout(() => {
         document.querySelector('#deliverModal .modal-content').focus();
       }, 50);
