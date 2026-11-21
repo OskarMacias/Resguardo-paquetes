@@ -18,6 +18,8 @@
   <!-- Firebase JS SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- ZXing Barcode/QR Scanner -->
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <style>
     :root {
       --primary: #2563eb;
@@ -59,6 +61,9 @@
     
     button { background-color: var(--primary); color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; font-size: 0.95rem; }
     button:hover { background-color: var(--primary-hover); }
+
+    .btn-scan { background-color: #0f766e; padding: 7px 11px; font-size: 0.8rem; width: auto; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; }
+    .btn-scan:hover { background-color: #115e59; }
     
     .btn-action { padding: 6px 10px; font-size: 0.8rem; width: auto; background-color: var(--success); }
     .btn-edit { background-color: #0284c7; padding: 6px 10px; font-size: 0.8rem; width: auto; margin-right: 4px; }
@@ -134,6 +139,8 @@
     .modal-header { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; color: #1e293b; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
     .modal-actions { display: flex; gap: 10px; margin-top: 15px; }
     .btn-cancel { background-color: #64748b; }
+
+    #scannerVideo { width: 100%; max-height: 300px; background: #0f172a; border-radius: 8px; object-fit: cover; }
     
     .report-filters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
     @media (max-width: 600px) { .report-filters { grid-template-columns: 1fr; } }
@@ -268,7 +275,10 @@
           </div>
 
           <div class="form-group" id="trackingGroup">
-            <label>Número(s) de Guía <small style="color:#2563eb; font-weight:normal;">(Debe iniciar con JMX + 12 números)</small></label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 6px; flex-wrap: wrap;">
+              <label style="margin-bottom: 0;">Número(s) de Guía <small style="color:#2563eb; font-weight:normal;">(JMX + 12 números)</small></label>
+              <button type="button" class="btn-scan" onclick="openBarcodeScanner('register')">📷 Escanear Guía</button>
+            </div>
             <textarea id="trackingNum" placeholder="Ej: JMX101853945903..." oninput="updateTrackingPreview()"></textarea>
             <div id="trackingPreview" style="margin-top: 4px;"></div>
           </div>
@@ -294,7 +304,7 @@
             <input type="text" id="anomalyNote" placeholder="Escribe el motivo..." style="display: none;">
           </div>
 
-          <div class="form-group"><label>Foto de Evidencia (Cámara o Galería)</label><input type="file" id="evidencePhoto" accept="image/*" capture="environment"></div>
+          <div class="form-group"><label>Foto de Evidencia (Galería o Cámara)</label><input type="file" id="evidencePhoto" accept="image/*"></div>
           <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="entryDate" required></div>
           <button type="submit" id="saveSubmitBtn">Guardar Registro</button>
         </form>
@@ -316,9 +326,10 @@
           Escanea o ingresa las guías (Formato: JMX + 12 números). Puedes respaldar o pegar tu lista completa para no perderla.
         </p>
         
-        <div class="form-group" style="display: flex; gap: 8px;">
-          <input type="text" id="inventoryScanInput" placeholder="Escanea o escribe guía (Ej: JMX101853945903)..." onkeypress="if(event.key==='Enter'){addPhysicalItem(); event.preventDefault();}">
-          <button type="button" onclick="addPhysicalItem()" style="width: 120px; background-color: #0284c7;">➕ Agregar</button>
+        <div class="form-group" style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <input type="text" id="inventoryScanInput" style="flex: 1 1 200px;" placeholder="Escanea o escribe guía (Ej: JMX101853945903)..." onkeypress="if(event.key==='Enter'){addPhysicalItem(); event.preventDefault();}">
+          <button type="button" class="btn-scan" onclick="openBarcodeScanner('inventory')">📷 Escanear</button>
+          <button type="button" onclick="addPhysicalItem()" style="width: 110px; background-color: #0284c7;">➕ Agregar</button>
         </div>
 
         <!-- Opciones de Respaldo / Pegar en bloque -->
@@ -404,6 +415,19 @@
     </div>
   </div>
 
+  <!-- Modal Escáner de Guía con Cámara -->
+  <div id="scannerModal" class="modal">
+    <div class="modal-content" tabindex="-1">
+      <div class="modal-header">📷 Escanear Código de Guía</div>
+      <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 8px;">Apunta la cámara al código de barras o QR de la guía (JMX...).</p>
+      <video id="scannerVideo" playsinline muted></video>
+      <p id="scannerStatus" style="font-size: 0.8rem; color: #0f766e; font-weight: 600; margin-top: 8px; text-align: center;">Iniciando cámara...</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeBarcodeScanner()">Cerrar Cámara</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal de Edición -->
   <div id="editModal" class="modal">
     <div class="modal-content" tabindex="-1">
@@ -433,10 +457,10 @@
       <div class="modal-header" id="deliverModalTitle">📦 Entregar Paquete</div>
       <input type="hidden" id="deliverKey">
       <div class="form-group">
-        <label>Tomar Foto de Evidencia (Cámara o Galería)</label>
-        <input type="file" id="deliverPhotoInput" accept="image/*" capture="environment">
+        <label>Evidencia de Entrega (Tomar Foto o Elegir de Galería)</label>
+        <input type="file" id="deliverPhotoInput" accept="image/*">
       </div>
-      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Toma la foto con la cámara o presiona Enter para entregar de inmediato sin foto.</em></p>
+      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Toca el selector para tomar foto o elegir de tu galería, o presiona Enter para entregar de inmediato sin foto.</em></p>
       <div class="modal-actions">
         <button type="button" onclick="confirmDeliveryWithPhoto()">Entregar</button>
         <button type="button" class="btn-cancel" onclick="closeDeliverModal()">Cancelar</button>
@@ -500,6 +524,8 @@
     let packages = [];
     let scannedPhysicalTrackings = new Set();
     let searchTimeout = null;
+    let codeReader = null;
+    let scannerTarget = null;
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -567,6 +593,68 @@
         }
       });
     });
+
+    async function openBarcodeScanner(target) {
+      scannerTarget = target;
+      const modal = document.getElementById('scannerModal');
+      const statusEl = document.getElementById('scannerStatus');
+      modal.style.display = 'flex';
+      statusEl.textContent = 'Iniciando cámara...';
+
+      if (typeof ZXing === 'undefined') {
+        statusEl.textContent = 'No se cargó el lector de códigos. Verifica tu conexión o escribe la guía manualmente.';
+        return;
+      }
+
+      try {
+        if (!codeReader) {
+          codeReader = new ZXing.BrowserMultiFormatReader();
+        } else {
+          codeReader.reset();
+        }
+
+        await codeReader.decodeFromConstraints(
+          { video: { facingMode: { ideal: 'environment' } } },
+          'scannerVideo',
+          (result, err) => {
+            if (result && result.getText()) {
+              const rawCode = result.getText().trim().toUpperCase();
+              const match = rawCode.match(/JMX\d{12}/);
+              const detectedTracking = match ? match[0] : rawCode;
+
+              applyScannedTracking(detectedTracking);
+              closeBarcodeScanner();
+            }
+          }
+        );
+        statusEl.textContent = 'Cámara activa — apunta al código de la guía';
+      } catch (error) {
+        statusEl.textContent = 'No se pudo acceder a la cámara. Revisa los permisos de cámara en el navegador.';
+      }
+    }
+
+    function applyScannedTracking(tracking) {
+      if (scannerTarget === 'register') {
+        const ta = document.getElementById('trackingNum');
+        const current = ta.value.trim();
+        ta.value = current ? `${current}\n${tracking}` : tracking;
+        updateTrackingPreview();
+      } else if (scannerTarget === 'inventory') {
+        const invInput = document.getElementById('inventoryScanInput');
+        invInput.value = tracking;
+        addPhysicalItem();
+      }
+    }
+
+    function closeBarcodeScanner() {
+      if (codeReader) {
+        try {
+          codeReader.reset();
+        } catch (e) {}
+      }
+      document.getElementById('scannerModal').style.display = 'none';
+      scannerTarget = null;
+    }
 
     function saveInventoryToLocalStorage() {
       localStorage.setItem('scannedPhysicalTrackings', JSON.stringify(Array.from(scannedPhysicalTrackings)));
