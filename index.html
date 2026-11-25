@@ -2,1600 +2,1361 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
-  <title>Control de Paquetes y Reincidencias</title>
-
-  <!-- PWA y Logotipo Oficial -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Toyota Corolla HEV • Flotilla</title>
   <link rel="manifest" href="./manifest.json">
-  <link rel="icon" type="image/png" href="./icon.png">
-  <link rel="apple-touch-icon" href="./icon.png">
-  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="icon" type="image/png" href="./icon-512.png">
+  <link rel="apple-touch-icon" href="./icon-512.png">
+  <meta name="theme-color" content="#0b1120">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Control Paquetes">
-  <meta name="theme-color" content="#2563eb">
-
-  <!-- Firebase JS SDK (Compat) -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <!-- ZXing Barcode/QR Scanner -->
-  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <style>
     :root {
-      --primary: #2563eb;
-      --primary-hover: #1d4ed8;
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --text: #1e293b;
-      --border: #e2e8f0;
-      --success: #16a34a;
-      --warning: #d97706;
-      --danger: #dc2626;
+      --bg-main: #0b1120;
+      --bg-card: #111827;
+      --bg-input: #1f2937;
+      --border: #374151;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --emerald: #10b981;
+      --blue: #3b82f6;
+      --amber: #f59e0b;
+      --purple: #8b5cf6;
+      --red: #ef4444;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
-    body { 
-      background-color: var(--bg); 
-      color: var(--text); 
-      padding: 15px; 
-      max-width: 1350px; 
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      padding-bottom: 84px;
+      overflow-x: hidden;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(11, 17, 32, 0.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .toyota-badge {
+      width: 34px;
+      height: 34px;
+      background: #1f2937;
+      border: 1px solid #4b5563;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #f9fafb;
+      letter-spacing: 0.3px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .pill-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pill-btn.active-ble {
+      border-color: var(--blue);
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.15);
+    }
+
+    .pill-btn.online { border-color: var(--emerald); color: #6ee7b7; }
+    .pill-btn.offline { border-color: var(--amber); color: #fcd34d; }
+
+    .app-container {
+      max-width: 480px;
       margin: 0 auto;
-      padding-bottom: env(safe-area-inset-bottom, 30px);
-    }
-    
-    .app-header { display: flex; align-items: center; gap: 12px; margin-bottom: 5px; justify-content: center; flex-wrap: wrap; }
-    .app-logo { width: 40px; height: 40px; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    h1 { color: #0f172a; font-size: 1.6rem; }
-    .status-cloud { font-size: 0.85rem; text-align: center; margin-bottom: 20px; color: #16a34a; font-weight: bold; }
-    
-    .grid-container { display: grid; grid-template-columns: 1.1fr 2fr; gap: 20px; }
-    @media (max-width: 950px) { .grid-container { grid-template-columns: 1fr; } }
-
-    .card { background: var(--card-bg); border-radius: 10px; padding: 18px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid var(--border); margin-bottom: 20px; }
-    .card h2 { font-size: 1.15rem; margin-bottom: 14px; color: #334155; border-bottom: 2px solid var(--bg); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
-    
-    .form-group { margin-bottom: 12px; position: relative; }
-    label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.85rem; }
-    input, select, textarea { width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 16px; outline: none; }
-    textarea { resize: vertical; min-height: 50px; }
-    
-    button { background-color: var(--primary); color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; font-size: 0.95rem; }
-    button:hover { background-color: var(--primary-hover); }
-
-    .btn-scan { background-color: #0f766e; padding: 8px 12px; font-size: 0.82rem; width: auto; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
-    .btn-scan:hover { background-color: #115e59; }
-
-    .photo-picker-row { display: flex; gap: 8px; margin-top: 6px; }
-    .btn-camera-pick { background-color: #0284c7; padding: 9px 12px; font-size: 0.85rem; flex: 1; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
-    .btn-camera-pick:hover { background-color: #0369a1; }
-    .btn-gallery-pick { background-color: #7c3aed; padding: 9px 12px; font-size: 0.85rem; flex: 1; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
-    .btn-gallery-pick:hover { background-color: #6d28d9; }
-    .photo-selected-status { font-size: 0.78rem; color: #15803d; font-weight: 600; margin-top: 6px; display: none; }
-    
-    .btn-action { padding: 6px 10px; font-size: 0.8rem; width: auto; background-color: var(--success); }
-    .btn-edit { background-color: #0284c7; padding: 6px 10px; font-size: 0.8rem; width: auto; margin-right: 4px; }
-    .btn-delete { background-color: var(--danger); padding: 6px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; cursor: pointer; border: none; margin-left: 4px; }
-    .btn-delete:hover { background-color: #b91c1c; }
-    .btn-photo { background-color: #8b5cf6; padding: 6px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; display: inline-block; cursor: pointer; text-decoration: none; margin-top: 2px; }
-    .btn-upload-photo { background-color: #0284c7; padding: 6px 10px; font-size: 0.8rem; width: auto; color: white; border-radius: 4px; cursor: pointer; display: inline-block; margin-top: 2px; }
-    .btn-restore { background-color: #0284c7; padding: 10px 14px; font-size: 0.9rem; }
-
-    .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-    .stat-box { padding: 8px; border-radius: 8px; text-align: center; font-size: 0.75rem; font-weight: 600; }
-    .stat-box.danger  { background: #fee2e2; color: #991b1b; }
-    .stat-box.warning { background: #fef3c7; color: #78350f; }
-    .stat-box.success { background: #dcfce7; color: #14532d; }
-    .stat-number { font-size: 1.2rem; font-weight: bold; }
-
-    .risk-banner { padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; margin-bottom: 12px; text-align: center; }
-    .risk-low { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-    .risk-medium { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
-    .risk-high { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
-    th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
-    th { background-color: #f8fafc; color: #64748b; white-space: nowrap; }
-
-    tr.status-green  { background-color: #dcfce7 !important; border-left: 6px solid #16a34a !important; }
-    tr.status-yellow { background-color: #fef08a !important; border-left: 6px solid #ca8a04 !important; }
-    tr.status-orange { background-color: #ffedd5 !important; border-left: 6px solid #ea580c !important; }
-    tr.status-red    { background-color: #fee2e2 !important; border-left: 6px solid #dc2626 !important; }
-
-    .day-badge { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 0.82rem; display: inline-block; text-align: center; white-space: nowrap; }
-    .day-badge.green  { background-color: #16a34a; color: white; }
-    .day-badge.yellow { background-color: #ca8a04; color: white; }
-    .day-badge.orange { background-color: #ea580c; color: white; }
-    .day-badge.red    { background-color: #dc2626; color: white; }
-
-    .badge { padding: 3px 7px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
-    .badge-resguardo { background: #fef3c7; color: #b45309; }
-    .badge-entregado { background: #dcfce7; color: #15803d; }
-    .badge-anomalia  { background: #fee2e2; color: #991b1b; }
-    .badge-indefinido { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 4px; }
-
-    .client-stats { font-size: 0.75rem; font-weight: bold; color: #475569; display: block; margin-top: 2px; }
-    .empty-message { text-align: center; color: #94a3b8; padding: 15px; }
-    .section-subtitle { font-size: 0.95rem; font-weight: bold; margin-top: 15px; margin-bottom: 6px; color: #475569; border-left: 3px solid var(--primary); padding-left: 8px; }
-    
-    .pkg-number { display: inline-block; background: #e2e8f0; color: #334155; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-right: 5px; }
-
-    .inventory-chip { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; margin: 2px; }
-    .inventory-chip .remove-chip { cursor: pointer; margin-left: 5px; color: #dc2626; font-weight: bold; }
-
-    .tracking-chip { display: inline-block; background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; margin: 2px; border: 1px solid #bfdbfe; }
-
-    .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--border); border-radius: 0 0 6px 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 150px; overflow-y: auto; z-index: 99; display: none; }
-    .autocomplete-item { padding: 10px 12px; cursor: pointer; font-size: 0.9rem; border-bottom: 1px solid #f1f5f9; }
-    .autocomplete-item:hover { background-color: #f8fafc; color: var(--primary); font-weight: bold; }
-
-    .checkbox-container { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px; font-size: 0.85rem; font-weight: bold; color: #1e3a8a; }
-    .checkbox-container input { width: auto; cursor: pointer; }
-
-    .highlight-row { animation: highlightAnim 2.5s ease-out; }
-    @keyframes highlightAnim {
-      0% { background-color: #fef08a; }
-      50% { background-color: #fef08a; }
-      100% { background-color: transparent; }
+      padding: 14px;
     }
 
-    .search-row-clickable { cursor: pointer; }
-    .search-row-clickable:hover { background-color: #f1f5f9; }
+    .tab-section { display: none; }
+    .tab-section.active { display: block; }
 
-    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; padding: 15px; }
-    .modal-content { background-color: white; padding: 20px; border-radius: 10px; width: 100%; max-width: 500px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; outline: none; }
-    .modal-header { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; color: #1e293b; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-    .modal-actions { display: flex; gap: 10px; margin-top: 15px; }
-    .btn-cancel { background-color: #64748b; }
+    @media (min-width: 768px) {
+      body { padding-bottom: 20px; }
+      .app-container {
+        max-width: 1120px;
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 16px;
+        align-items: start;
+      }
+      .bottom-nav { display: none !important; }
+      #sec-ruta { display: block !important; grid-column: 1; }
+      .right-column-desktop {
+        grid-column: 2;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      #sec-bovedas, #sec-tarifas { display: block !important; }
+    }
 
-    #scannerVideo { width: 100%; max-height: 300px; background: #0f172a; border-radius: 8px; object-fit: cover; }
-    
-    .report-filters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-    @media (max-width: 600px) { .report-filters { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 15px;
+      margin-bottom: 14px;
+    }
 
-    .preview-img { max-width: 100%; max-height: 350px; border-radius: 8px; margin: 10px auto; border: 1px solid var(--border); display: block; cursor: zoom-in; transition: transform 0.2s ease; }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
 
-    .lightbox-modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; cursor: zoom-out; }
-    .lightbox-modal img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 6px; }
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+    }
 
-    /* BANNER INSTALAR PWA */
-    #installBanner {
-      display: none;
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tele-box {
+      background: var(--bg-input);
+      border-radius: 12px;
+      padding: 10px 8px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .tele-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+    .tele-val { font-size: 17px; font-weight: 800; color: var(--text-main); }
+
+    .btn-edit-leg {
+      width: 100%;
+      background: rgba(59, 130, 246, 0.16);
+      border: 1px dashed var(--blue);
+      color: #93c5fd;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn-action {
+      width: 100%;
+      border: none;
+      border-radius: 14px;
+      padding: 15px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 10px;
+      transition: transform 0.1s ease;
+    }
+
+    .btn-action:active { transform: scale(0.98); }
+    .btn-sub { font-size: 12px; font-weight: 500; opacity: 0.9; }
+
+    .bg-emerald { background: linear-gradient(135deg, #059669, #10b981); }
+    .bg-blue { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+    .bg-amber { background: linear-gradient(135deg, #d97706, #f59e0b); color: #111827; }
+    .bg-purple { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
+    .bg-red { background: linear-gradient(135deg, #dc2626, #ef4444); }
+    .bg-slate { background: #374151; }
+
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+
+    input, select {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 11px 12px;
+      border-radius: 10px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    input:focus, select:focus { border-color: var(--emerald); }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .vault-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .vault-box {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .vault-name { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+    .vault-amount { font-size: 19px; font-weight: 800; }
+
+    .loan-card {
+      background: rgba(31, 41, 55, 0.85);
+      border: 1px solid #4b5563;
+      border-radius: 12px;
+      padding: 11px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .progress-wrap {
+      background: var(--bg-input);
+      border-radius: 999px;
+      height: 14px;
+      overflow: hidden;
+      margin: 8px 0;
+      border: 1px solid var(--border);
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #34d399);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .route-item {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .route-info strong { display: block; font-size: 14px; }
+    .route-info span { font-size: 12px; color: var(--text-muted); }
+    .route-actions { display: flex; gap: 6px; }
+
+    .mini-btn {
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+    }
+
+    .log-item { border-bottom: 1px solid var(--border); padding: 10px 0; font-size: 13px; }
+    .log-item:last-child { border-bottom: none; }
+
+    .bottom-nav {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      background: #1e293b;
-      color: white;
-      padding: 14px 16px;
-      z-index: 3000;
-      box-shadow: 0 -4px 12px rgba(0,0,0,0.25);
+      background: #0f172a;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      padding: 8px 4px;
+      z-index: 50;
+    }
+
+    .nav-item {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-    }
-    #installBanner.show { display: flex; }
-    #installBanner p { margin: 0; font-size: 0.9rem; flex: 1 1 180px; }
-    #installBanner button {
-      width: auto;
-      padding: 8px 16px;
-      font-size: 0.85rem;
-      background: #16a34a;
-    }
-    #installBanner .btn-close-install {
-      background: transparent;
-      color: #94a3b8;
-      padding: 6px 10px;
-      font-size: 1.1rem;
-      width: auto;
-      line-height: 1;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
     }
 
-    @media (max-width: 700px) {
-      body { padding: 10px; }
-      h1 { font-size: 1.3rem; }
-      .card { padding: 14px; margin-bottom: 14px; }
-      .card h2 { font-size: 1rem; }
-      .stat-box { padding: 6px; font-size: 0.7rem; }
-      .stat-number { font-size: 1rem; }
+    .nav-item.active { color: var(--emerald); }
 
-      .card > div[style*="overflow-x"] {
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: thin;
-      }
-      table { font-size: 0.78rem; min-width: 620px; }
-      th, td { padding: 6px 7px; }
-
-      td button, td .btn-photo, td .btn-upload-photo {
-        display: inline-block;
-        margin: 2px 0;
-      }
-
-      .modal-actions { flex-direction: column; }
-      .modal-actions button { width: 100%; }
-
-      .report-filters { gap: 8px; }
-      input, select, textarea { padding: 11px; }
+    .badge-phase {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border: 1px solid var(--emerald);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
     }
+
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-  <div class="app-header">
-    <img src="./icon.png" alt="Logo" class="app-logo">
-    <h1>📦 Control de Paquetes y Reincidencias</h1>
-  </div>
-  <div class="status-cloud">☁️ Sincronización en Tiempo Real Activa</div>
-
-  <div class="grid-container">
-    <div>
-      <!-- Buscador General -->
-      <div class="card">
-        <h2>🔍 Buscador General</h2>
-        <div class="form-group" style="display: flex; gap: 8px; align-items: center;">
-          <input type="text" id="searchInput" style="flex: 1;" placeholder="Escribe nombre, teléfono o # guía..." oninput="searchPackages()">
-          <button type="button" class="btn-scan" onclick="openBarcodeScanner('search')">📷 Escanear</button>
+  <!-- BARRA SUPERIOR CON EMBLEMA TOYOTA -->
+  <header class="topbar">
+    <div class="brand-wrap">
+      <div class="toyota-badge" title="Toyota Corolla HEV">
+        <svg viewBox="0 0 100 68" width="26" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="50" cy="34" rx="45" ry="29" stroke="#E5E7EB" stroke-width="5.5"/>
+          <ellipse cx="50" cy="34" rx="14" ry="28" stroke="#E5E7EB" stroke-width="5"/>
+          <ellipse cx="50" cy="21" rx="31" ry="13" stroke="#E5E7EB" stroke-width="5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">COROLLA HEV • 2022</div>
+        <div style="font-size:11px; color:var(--text-muted);" id="odo-display" onclick="calibrarOdometro()">
+          Odo: <strong id="odo-val" style="color:#fff;">45,200.0</strong> km ✎
         </div>
+      </div>
+    </div>
+    <div class="status-row">
+      <button class="pill-btn" id="btn-ble" onclick="conectarOBD2()">🔌 OBD2</button>
+      <button class="pill-btn" id="btn-sim-toggle" onclick="toggleSimulador()">🎛️ Sim</button>
+      <span class="pill-btn online" id="net-status">🟢 Online</span>
+    </div>
+  </header>
 
-        <div id="searchResults" style="display: none;">
-          <div class="stats-container">
-            <div class="stat-box danger"><div>🚨 Anomalías</div><div class="stat-number" id="statAnomalies">0</div></div>
-            <div class="stat-box warning"><div>📦 Resguardos</div><div class="stat-number" id="statPending">0</div></div>
-            <div class="stat-box success"><div>✅ Entregados</div><div class="stat-number" id="statSigned">0</div></div>
-          </div>
+  <main class="app-container">
 
-          <div id="riskBanner" class="risk-banner" style="display: none;"></div>
-
-          <div class="section-subtitle">📦 Registros Encontrados:</div>
-          <div style="overflow-x: auto; max-height: 450px; overflow-y: auto;">
-            <table>
-              <thead><tr><th>Cliente / Guía</th><th>Fechas</th><th>Estado / Acciones</th></tr></thead>
-              <tbody id="searchResultsBody"></tbody>
-            </table>
-          </div>
+    <!-- COLUMNA 1: EN RUTA (1-TOQUE) -->
+    <section id="sec-ruta" class="tab-section active">
+      <div id="sim-panel" class="card hidden" style="border-color: var(--blue);">
+        <div class="card-header">
+          <span class="card-title" style="color:#93c5fd;">Simulador de Movimiento en Vivo</span>
+          <strong id="sim-speed-label">0 km/h</strong>
+        </div>
+        <input type="range" id="sim-speed" min="0" max="120" value="0" oninput="actualizarVelocidadSim(this.value)">
+        <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+          Mueve el control para simular avance real de odómetro y tiempo sin GPS/OBD2.
         </div>
       </div>
 
-      <!-- Formulario Unificado -->
       <div class="card">
-        <h2>Registrar Paquete(s) / Anomalía</h2>
-        <form id="packageForm" autocomplete="off">
+        <div class="card-header">
+          <span class="card-title">Estado de Operación</span>
+          <span class="badge-phase" id="phase-badge">EN BASE (LISTO)</span>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="tele-box">
+            <div class="tele-label">Tramo Actual</div>
+            <div class="tele-val" id="live-km">0.00 km</div>
+          </div>
+          <div class="tele-box">
+            <div class="tele-label">Tiempo</div>
+            <div class="tele-val" id="live-time">00:00</div>
+          </div>
+          <div class="tele-box">
+            <div class="tele-label">Velocidad</div>
+            <div class="tele-val" id="live-speed">0 km/h</div>
+          </div>
+        </div>
+
+        <!-- BOTÓN DE CORRECCIÓN MANUAL DE KILÓMETROS DEL TRAMO -->
+        <button id="btn-edit-leg-km" class="btn-edit-leg hidden" onclick="editarKmTramoActual()">
+          <span>✎ Ajustar km del tramo actual (si falló GPS)</span>
+        </button>
+
+        <div id="cycle-summary" class="hidden" style="background:var(--bg-input); padding:10px; border-radius:10px; font-size:12px; margin-bottom:12px; border:1px solid var(--border);">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <span style="color:var(--text-muted);">Acercamiento (A → B):</span>
+            <strong id="sum-ab">0.00 km</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <span style="color:var(--text-muted);">Con Cliente (B → C):</span>
+            <strong id="sum-bc" style="color:var(--emerald);">0.00 km</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--text-muted);">Retorno / Extra:</span>
+            <strong id="sum-ca">0.00 km</strong>
+          </div>
+        </div>
+
+        <!-- FASE 0: EN BASE -->
+        <div id="controls-idle">
+          <button class="btn-action bg-emerald" onclick="iniciarAcercamiento()">
+            <span>🟢 Salir de Base (Ir por Cliente)</span>
+            <span class="btn-sub">Sella odómetro e inicia conteo A → B</span>
+          </button>
+          <button class="btn-action bg-blue" onclick="iniciarTrasladoOperativo()">
+            <span>🚚 Traslado Vacío a Base / Zona ($0)</span>
+            <span class="btn-sub">Suma km operativos al auto sin castigar tu comisión</span>
+          </button>
+          <button class="btn-action bg-purple" onclick="iniciarVueltaPersonal()">
+            <span>🟣 Iniciar Vuelta Personal</span>
+            <span class="btn-sub">Sin comisión • Descuenta costo puro de tu bolsa</span>
+          </button>
+        </div>
+
+        <!-- FASE 1: ACERCAMIENTO (A -> B) -->
+        <div id="controls-pickup" class="hidden">
+          <button class="btn-action bg-blue" onclick="recogerCliente()">
+            <span>📍 Recogí al Cliente (Iniciar B → C)</span>
+            <span class="btn-sub">Congela km muertos e inicia viaje efectivo</span>
+          </button>
+          <button class="btn-action bg-slate" onclick="cerrarComoTrasladoVacio()">
+            <span>🚚 Cerrar como Traslado Vacío ($0)</span>
+            <span class="btn-sub">Guarda los km recorridos sin cobrar cliente</span>
+          </button>
+          <button class="btn-action bg-red" onclick="cancelarCiclo()">
+            <span>✖ Cancelar Servicio</span>
+          </button>
+        </div>
+
+        <!-- FASE 2: CON CLIENTE (B -> C) -->
+        <div id="controls-trip" class="hidden">
           <div class="form-group">
-            <label>Estado del Registro</label>
-            <select id="status" onchange="toggleAnomalyMode()">
-              <option value="Resguardado">En Resguardo (Pide guardar en bodega)</option>
-              <option value="Anomalía">Anomalía (No entregado / No vino Día 1)</option>
-              <option value="Entregado">Entregado / Firmado</option>
+            <label>Tarifa Fija Rápida o Cotización</label>
+            <select id="quick-route-select" onchange="aplicarTarifaRapida(this.value)">
+              <option value="">-- Seleccionar ruta o calcular por km --</option>
             </select>
           </div>
-
           <div class="form-group">
-            <label>Teléfono (Original)</label>
-            <input type="tel" id="phone" required placeholder="Ej: 6671234567" oninput="handleAutoComplete('phone')">
-            <div id="phoneSuggestions" class="autocomplete-list"></div>
+            <label>Monto a Cobrar al Cliente ($ MXN — pon 0 si fue traslado vacío)</label>
+            <input type="number" id="trip-fare-input" placeholder="Ej. 300 (o 0 si vienes vacío)" step="5">
+          </div>
+          <div id="live-commission-preview" style="background:rgba(16,185,129,0.1); border:1px solid var(--emerald); border-radius:10px; padding:10px; font-size:12px; margin-bottom:10px;">
+            Calculando reparto estimado...
+          </div>
+          <button class="btn-action bg-emerald" onclick="llegarDestino()">
+            <span>🏁 Llegué al Destino (Finalizar Tramo)</span>
+            <span class="btn-sub">Registra cobro (o $0) y elige retorno o espera</span>
+          </button>
+        </div>
+
+        <!-- FASE 3: OPCIONES POST-DESTINO -->
+        <div id="controls-post-drop" class="hidden">
+          <button class="btn-action bg-amber" onclick="iniciarEsperaRedondo()">
+            <span>⏳ Esperar Cliente (Viaje Redondo)</span>
+            <span class="btn-sub">Cobra $2.50/min espera + 50% tarifa de regreso</span>
+          </button>
+          <button class="btn-action bg-blue" onclick="iniciarRetornoBase()">
+            <span>🏠 Regresar Vacío a Base</span>
+            <span class="btn-sub">Suma km de vuelta al costo del servicio</span>
+          </button>
+          <button class="btn-action bg-emerald" onclick="quedarEnZona()">
+            <span>📍 Quedarme en Zona / Base (Cerrar aquí)</span>
+            <span class="btn-sub">Cierra el recorrido actual y guarda en bitácora</span>
+          </button>
+        </div>
+
+        <!-- FASE 4: ESPERANDO CLIENTE -->
+        <div id="controls-waiting" class="hidden">
+          <div style="text-align:center; padding:10px; background:var(--bg-input); border-radius:10px; margin-bottom:10px;">
+            <div style="font-size:12px; color:var(--amber);">Tiempo de espera acumulado:</div>
+            <div style="font-size:22px; font-weight:800;" id="wait-fee-live">$0.00 MXN</div>
+          </div>
+          <button class="btn-action bg-emerald" onclick="iniciarRegresoCliente()">
+            <span>🔄 Iniciar Regreso con Cliente (50% tarifa)</span>
+            <span class="btn-sub">Suma espera + mitad de tarifa de vuelta</span>
+          </button>
+        </div>
+
+        <!-- FASE 5: REGRESO CON CLIENTE -->
+        <div id="controls-return-client" class="hidden">
+          <button class="btn-action bg-emerald" onclick="finalizarViajeRedondo()">
+            <span>🏁 Finalizar Viaje Redondo y Cerrar</span>
+            <span class="btn-sub">Reparte el total en tus 4 bóvedas</span>
+          </button>
+        </div>
+
+        <!-- FASE 6: REGRESANDO VACÍO A BASE -->
+        <div id="controls-returning" class="hidden">
+          <button class="btn-action bg-amber" onclick="interceptarNuevoServicio()">
+            <span>🔄 Interceptar / Ir por Otro Cliente</span>
+            <span class="btn-sub">Cierra ciclo aquí e inicia acercamiento a nuevo pasaje</span>
+          </button>
+          <button class="btn-action bg-emerald" onclick="llegarABase()">
+            <span>🏠 Llegué a Base (Cerrar Jornada)</span>
+            <span class="btn-sub">Sella odómetro final y guarda en bóvedas</span>
+          </button>
+        </div>
+
+        <!-- FASE 7: VUELTA PERSONAL -->
+        <div id="controls-personal" class="hidden">
+          <button class="btn-action bg-purple" onclick="finalizarVueltaPersonal()">
+            <span>🏠 Finalizar Vuelta Personal</span>
+            <span class="btn-sub">Transfiere costo/km desde tu comisión al auto</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUMNA DERECHA -->
+    <div class="right-column-desktop">
+
+      <!-- SECCIÓN 2: BÓVEDAS Y PLAN DUAL DE CRÉDITO -->
+      <section id="sec-bovedas" class="tab-section">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" id="active-month-label">Meta Mensual Crédito (Diciembre)</span>
+            <strong style="color:var(--emerald);" id="credit-goal-text">$0 / $7,783.09</strong>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-bar" id="credit-progress-bar"></div>
+          </div>
+          <div style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; margin-bottom:12px;">
+            <span id="credit-pct">0% completado</span>
+            <span id="credit-rem">Faltan $7,783.09</span>
           </div>
 
+          <!-- DESGLOSE DE LOS 2 PRÉSTAMOS -->
+          <div class="loan-card">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <strong style="color:#60a5fa;">Préstamo 1 (Inicia 1 Dic • 6 meses)</strong>
+              <span id="loan1-count" style="font-weight:700;">Pagos: 0 / 6</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; color:var(--text-muted);">
+              <span>Letra: <strong>$7,783.09</strong>/mes</span>
+              <span>Saldo: <strong id="loan1-bal" style="color:#fff;">$46,698.54</strong></span>
+            </div>
+          </div>
+
+          <div class="loan-card">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <strong style="color:#a78bfa;">Préstamo 2 (Inicia 1 Ene • 60 meses)</strong>
+              <span id="loan2-count" style="font-weight:700;">Pagos: 0 / 60</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; color:var(--text-muted);">
+              <span>Letra: <strong>$5,297.95</strong>/mes</span>
+              <span>Saldo: <strong id="loan2-bal" style="color:#fff;">$317,877.00</strong></span>
+            </div>
+          </div>
+
+          <button class="btn-action bg-purple" style="padding:11px; font-size:13px; margin-top:8px;" onclick="pagarMensualidadActual()">
+            ✅ Registrar Pago de Mensualidad del Mes
+          </button>
+
+          <div class="vault-grid" style="margin-top:12px; margin-bottom:0;">
+            <div class="vault-box">
+              <div class="vault-name">⛽ Caja Gasolina</div>
+              <div class="vault-amount" style="color:#60a5fa;" id="v-gas">$0.00</div>
+            </div>
+            <div class="vault-box">
+              <div class="vault-name">🔧 Taller / Llantas</div>
+              <div class="vault-amount" style="color:#fbbf24;" id="v-maint">$0.00</div>
+            </div>
+            <div class="vault-box">
+              <div class="vault-name">👨‍✈️ Tu Comisión Libre</div>
+              <div class="vault-amount" style="color:#34d399;" id="v-comm">$0.00</div>
+            </div>
+            <div class="vault-box">
+              <div class="vault-name">🏦 Bóveda Crédito</div>
+              <div class="vault-amount" style="color:#a78bfa;" id="v-credit">$0.00</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Registro de Recarga de Gasolina -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">⛽ Registrar Carga de Gasolina</span>
+            <span style="font-size:11px; color:var(--emerald);" id="current-kml-badge">20.0 km/L</span>
+          </div>
+          <div class="row-2">
+            <div class="form-group">
+              <label>Pesos Pagados ($)</label>
+              <input type="number" id="fuel-pesos" placeholder="Ej. 700" oninput="previsualizarGasolina()">
+            </div>
+            <div class="form-group">
+              <label>Litros Cargados (L)</label>
+              <input type="number" id="fuel-liters" placeholder="Ej. 29.4" step="0.01" oninput="previsualizarGasolina()">
+            </div>
+          </div>
+          <div class="row-2">
+            <div class="form-group">
+              <label>Odómetro Actual (km)</label>
+              <input type="number" id="fuel-odo" step="0.1">
+            </div>
+            <div class="form-group" style="display:flex; align-items:center; padding-top:18px;">
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#fff;">
+                <input type="checkbox" id="fuel-full" checked style="width:18px; height:18px;">
+                ¿Tanque Lleno?
+              </label>
+            </div>
+          </div>
+          <div id="fuel-calc-preview" style="font-size:12px; color:#93c5fd; margin-bottom:10px;">
+            Ingresa pesos y litros para calcular $/L y rendimiento real.
+          </div>
+          <button class="btn-action bg-blue" style="padding:12px; font-size:14px;" onclick="registrarGasolina()">
+            Guardar Ticket y Descontar de Caja Gasolina
+          </button>
+        </div>
+
+        <!-- Gasto de Taller -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🔧 Registrar Gasto de Taller / Llantas</span>
+          </div>
+          <div class="row-2">
+            <div class="form-group">
+              <label>Concepto</label>
+              <input type="text" id="maint-desc" placeholder="Ej. Cambio aceite / Lavado">
+            </div>
+            <div class="form-group">
+              <label>Monto ($ MXN)</label>
+              <input type="number" id="maint-cost" placeholder="Ej. 150">
+            </div>
+          </div>
+          <button class="btn-action bg-amber" style="padding:11px; font-size:14px;" onclick="registrarMantenimiento()">
+            Descontar de Caja Taller
+          </button>
+        </div>
+
+        <!-- Historial y Exportación -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Bitácora Reciente</span>
+            <div style="display:flex; gap:6px;">
+              <button class="mini-btn bg-blue" onclick="exportarCSV()">📥 CSV</button>
+              <button class="mini-btn bg-red" onclick="reiniciarTodo()">🗑️ Reset</button>
+            </div>
+          </div>
+          <div id="history-list" style="max-height:240px; overflow-y:auto;">
+            <div style="color:var(--text-muted); font-size:12px;">Sin movimientos registrados aún.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 3: TARIFAS BIDIRECCIONALES Y AJUSTES NUBE -->
+      <section id="sec-tarifas" class="tab-section">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Tarifas Fijas Bidireccionales (↔)</span>
+          </div>
+          <input type="hidden" id="edit-route-index" value="-1">
           <div class="form-group">
-            <label>Nombre de la persona</label>
-            <input type="text" id="personName" required placeholder="Ej: Yuliana Lopez" oninput="handleAutoComplete('name')">
-            <div id="nameSuggestions" class="autocomplete-list"></div>
+            <label>Nombre de la Ruta</label>
+            <input type="text" id="route-name" placeholder="Ej. Villa Juárez ↔ Ley del Valle">
           </div>
-
-          <div class="form-group" id="trackingGroup">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 6px; flex-wrap: wrap;">
-              <label style="margin-bottom: 0;">Número(s) de Guía <small style="color:#2563eb; font-weight:normal;">(JMX + 12 números)</small></label>
-              <button type="button" class="btn-scan" onclick="openBarcodeScanner('register')">📷 Escanear Guía</button>
+          <div class="row-2">
+            <div class="form-group">
+              <label>Distancia (km)</label>
+              <input type="number" id="route-km" placeholder="22">
             </div>
-            <textarea id="trackingNum" placeholder="Ej: JMX101853945903..." oninput="updateTrackingPreview()"></textarea>
-            <div id="trackingPreview" style="margin-top: 4px;"></div>
-          </div>
-
-          <div class="form-group"><label>Teléfono Alt. (Opcional)</label><input type="tel" id="altPhone"></div>
-          <div class="form-group" id="descGroup"><label>Descripción (Opcional)</label><input type="text" id="description"></div>
-
-          <div class="form-group" id="indefiniteResguardoGroup">
-            <label class="checkbox-container">
-              <input type="checkbox" id="isIndefinite"> ♾️ Resguardo Indefinido (Sin fecha límite)
-            </label>
-          </div>
-
-          <div class="form-group" id="anomalyGroup" style="display: none;">
-            <label>Motivo de Anomalía</label>
-            <select id="anomalyReasonSelect" onchange="checkCustomReason()" style="margin-bottom: 5px;">
-              <option value="No pasó a recoger el primer día">No pasó a recoger el primer día</option>
-              <option value="Prometió pasar mañana">Prometió pasar mañana</option>
-              <option value="Fuera de la ciudad">Fuera de la ciudad</option>
-              <option value="No contesta llamadas / WhatsApp">No contesta llamadas / WhatsApp</option>
-              <option value="OTRO">Otro motivo (Escribir abajo)</option>
-            </select>
-            <input type="text" id="anomalyNote" placeholder="Escribe el motivo..." style="display: none;">
-          </div>
-
-          <div class="form-group"><label>Foto de Evidencia (Galería o Cámara)</label><input type="file" id="evidencePhoto" accept="image/*"></div>
-          <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="entryDate" required></div>
-          <button type="submit" id="saveSubmitBtn">Guardar Registro</button>
-        </form>
-      </div>
-
-      <!-- Cargar Respaldo -->
-      <div class="card">
-        <h2>📤 Cargar Respaldo Guardado</h2>
-        <button type="button" class="btn-restore" onclick="document.getElementById('fileInput').click()">Subir archivo .json a la Nube</button>
-        <input type="file" id="fileInput" style="display: none;" accept=".json" onchange="importDataToFirebase(event)">
-      </div>
-    </div>
-
-    <div>
-      <!-- Control de Inventario -->
-      <div class="card" style="border-left: 4px solid #0284c7;">
-        <h2>🔍 Control de Inventario / Auditoría Física</h2>
-        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">
-          Escanea o ingresa las guías (Formato: JMX + 12 números). Puedes respaldar o pegar tu lista completa para no perderla.
-        </p>
-        
-        <div class="form-group" style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <input type="text" id="inventoryScanInput" style="flex: 1 1 200px;" placeholder="Escanea o escribe guía (Ej: JMX101853945903)..." onkeypress="if(event.key==='Enter'){addPhysicalItem(); event.preventDefault();}">
-          <button type="button" class="btn-scan" onclick="openBarcodeScanner('inventory')">📷 Escanear</button>
-          <button type="button" onclick="addPhysicalItem()" style="width: 110px; background-color: #0284c7;">➕ Agregar</button>
-        </div>
-
-        <!-- Opciones de Respaldo / Pegar en bloque -->
-        <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
-          <button type="button" onclick="copyInventoryBackup()" style="background-color: #0d9488; font-size: 0.8rem; padding: 6px 10px; width: auto;">📋 Copiar Guías Escaneadas</button>
-          <button type="button" onclick="openPasteModal()" style="background-color: #7c3aed; font-size: 0.8rem; padding: 6px 10px; width: auto;">📥 Pegar Bloque de Guías</button>
-        </div>
-
-        <div id="scannedChipsContainer" style="margin-bottom: 10px; min-height: 35px; border: 1px dashed var(--border); padding: 6px; border-radius: 6px;">
-          <small style="color:#94a3b8;" id="emptyInventoryHint">Ninguna guía agregada a la revisión física aún.</small>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-          <button type="button" onclick="processInventoryAudit()" style="background-color: var(--primary);">📋 Comparar con Sistema</button>
-          <button type="button" onclick="clearInventoryAudit()" style="background-color: #64748b; width: 130px;">Limpiar</button>
-        </div>
-
-        <div id="auditResults" style="display: none;">
-          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
-            <strong style="color: #166534; font-size: 0.9rem;">🟢 Coincidentes en Físico y Sistema: <span id="countMatched">0</span></strong>
-          </div>
-
-          <div id="unregisteredAuditContainer" style="display: none; margin-bottom: 15px;">
-            <div class="section-subtitle" style="border-left-color: #d97706; color: #b45309;">
-              ❓ Escaneados en Físico pero NO Registrados en Sistema:
-            </div>
-            <div style="overflow-x: auto; max-height: 180px; overflow-y: auto;">
-              <table>
-                <thead><tr><th>Guía Escaneada</th><th>Estado</th><th>Acción Rápida</th></tr></thead>
-                <tbody id="unregisteredAuditTableBody"></tbody>
-              </table>
+            <div class="form-group">
+              <label>Tarifa Fija ($ MXN)</label>
+              <input type="number" id="route-price" placeholder="300">
             </div>
           </div>
+          <button class="btn-action bg-emerald" style="padding:11px; font-size:14px;" id="btn-save-route" onclick="guardarTarifa()">
+            + Guardar Tarifa Fija
+          </button>
+          <div id="routes-list" style="margin-top:12px;"></div>
+        </div>
 
-          <div id="missingAuditContainer" style="display: none; margin-bottom: 10px;">
-            <div class="section-subtitle" style="border-left-color: #dc2626; color: #991b1b; display: flex; justify-content: space-between; align-items: center;">
-              <span>⚠️ Paquetes Faltantes en Físico (Entregados sin marcar salida):</span>
-              <span id="missingCountBadge" style="background: #dc2626; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;">0</span>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Parámetros del Corolla y Nube</span>
+          </div>
+          <div class="row-2">
+            <div class="form-group">
+              <label>Precio Gasolina ($/L)</label>
+              <input type="number" id="cfg-gas-price" step="0.01" onchange="guardarConfig()">
             </div>
-            <div style="overflow-x: auto; max-height: 200px; overflow-y: auto;">
-              <table>
-                <thead><tr><th>Guía</th><th>Cliente</th><th>Ingreso</th><th>Acción Rápida</th></tr></thead>
-                <tbody id="missingAuditTableBody"></tbody>
-              </table>
+            <div class="form-group">
+              <label>Rendimiento (km/L)</label>
+              <input type="number" id="cfg-kml" step="0.1" onchange="guardarConfig()">
             </div>
           </div>
+          <div class="row-2">
+            <div class="form-group">
+              <label>Desgaste/Taller ($/km)</label>
+              <input type="number" id="cfg-maint-km" step="0.05" onchange="guardarConfig()">
+            </div>
+            <div class="form-group">
+              <label>Tu Comisión (% Libre)</label>
+              <input type="number" id="cfg-comm-pct" min="10" max="90" onchange="guardarConfig()">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>URL Firebase Realtime Database (Auto-Sync WiFi)</label>
+            <input type="url" id="cfg-firebase-url" placeholder="https://tu-proyecto-default-rtdb.firebaseio.com" onchange="guardarConfig()">
+          </div>
+          <button class="btn-action bg-blue" style="padding:11px; font-size:14px;" onclick="sincronizarFirebase(true)">
+            ☁️ Sincronizar Ahora con Firebase
+          </button>
+          <div id="sync-log" style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+            Modo local activo. Se sincronizará automáticamente al detectar Wi-Fi si configuras la URL.
+          </div>
         </div>
-      </div>
-
-      <!-- Tabla Principal -->
-      <div class="card">
-        <h2>
-          <span>📋 Paquetes Activos en Resguardo</span>
-          <span style="background: #2563eb; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.9rem;" id="activeResguardoCount">Total: 0</span>
-        </h2>
-        <div style="overflow-x: auto;">
-          <table>
-            <thead><tr><th>#</th><th>Cliente / Tel.</th><th>Guía</th><th>Descripción</th><th>Estado</th><th>Fecha Ingreso</th><th>Días en Resguardo</th><th>Acciones</th></tr></thead>
-            <tbody id="generalTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Reporte e Histórico -->
-      <div class="card">
-        <h2>📊 Reporte e Historial Entregados por Cliente</h2>
-        <div class="report-filters">
-          <div><label>Buscar Cliente</label><input type="text" id="reportClientInput" placeholder="Nombre cliente..." oninput="generateClientReport()"></div>
-          <div><label>Fecha Inicio</label><input type="date" id="reportStartDate" onchange="generateClientReport()"></div>
-          <div><label>Fecha Fin</label><input type="date" id="reportEndDate" onchange="generateClientReport()"></div>
-        </div>
-        <div id="reportSummary" style="font-weight: bold; margin-bottom: 10px; color: #1e3a8a;"></div>
-        <div style="overflow-x: auto;">
-          <table>
-            <thead><tr><th>Guía</th><th>Cliente</th><th>Fecha Ingreso</th><th>Fecha Entrega / Firma</th><th>Evidencia</th></tr></thead>
-            <tbody id="reportTableBody">
-              <tr><td colspan="5" class="empty-message">Escribe el nombre de un cliente arriba para ver sus entregas.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      </section>
 
     </div>
-  </div>
+  </main>
 
-  <!-- Modal Escáner de Guía con Cámara -->
-  <div id="scannerModal" class="modal">
-    <div class="modal-content" tabindex="-1">
-      <div class="modal-header">📷 Escanear Código de Guía</div>
-      <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 8px;">Apunta la cámara al código de barras o QR de la guía (JMX...).</p>
-      <video id="scannerVideo" playsinline muted></video>
-      <p id="scannerStatus" style="font-size: 0.8rem; color: #0f766e; font-weight: 600; margin-top: 8px; text-align: center;">Iniciando cámara...</p>
-      <div class="modal-actions">
-        <button type="button" class="btn-cancel" onclick="closeBarcodeScanner()">Cerrar Cámara</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal de Edición -->
-  <div id="editModal" class="modal">
-    <div class="modal-content" tabindex="-1">
-      <div class="modal-header">✏️ Editar Registro de Paquete</div>
-      <input type="hidden" id="editKey">
-      <div class="form-group"><label>Número de Guía</label><input type="text" id="editTracking"></div>
-      <div class="form-group"><label>Nombre del Propietario</label><input type="text" id="editPerson"></div>
-      <div class="form-group"><label>Teléfono Original</label><input type="tel" id="editPhone"></div>
-      <div class="form-group"><label>Teléfono Alternativo</label><input type="tel" id="editAltPhone"></div>
-      <div class="form-group"><label>Descripción</label><input type="text" id="editDescription"></div>
-      <div class="form-group">
-        <label class="checkbox-container">
-          <input type="checkbox" id="editIsIndefinite"> ♾️ Resguardo Indefinido
-        </label>
-      </div>
-      <div class="form-group"><label>Fecha de Registro</label><input type="datetime-local" id="editEntryDate"></div>
-      <div class="modal-actions">
-        <button type="button" onclick="savePackageEdit()">Guardar Cambios</button>
-        <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal para Adjuntar Foto / Entregar -->
-  <div id="deliverModal" class="modal">
-    <div class="modal-content" tabindex="-1">
-      <div class="modal-header" id="deliverModalTitle">📦 Entregar Paquete</div>
-      <input type="hidden" id="deliverKey">
-      <div class="form-group">
-        <label>Evidencia de Entrega (Opcional)</label>
-        <input type="file" id="deliverCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleDeliverPhotoChange(this)">
-        <input type="file" id="deliverGalleryInput" accept="image/*" style="display: none;" onchange="handleDeliverPhotoChange(this)">
-        <div class="photo-picker-row">
-          <button type="button" class="btn-camera-pick" onclick="document.getElementById('deliverCameraInput').click()">📷 Tomar Foto</button>
-          <button type="button" class="btn-gallery-pick" onclick="document.getElementById('deliverGalleryInput').click()">🖼️ Subir Foto</button>
-        </div>
-        <div id="deliverPhotoStatus" class="photo-selected-status"></div>
-      </div>
-      <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">💡 <em>Tip: Toma o sube una foto, o presiona Enter para entregar de inmediato sin foto.</em></p>
-      <div class="modal-actions">
-        <button type="button" onclick="confirmDeliveryWithPhoto()">Entregar</button>
-        <button type="button" class="btn-cancel" onclick="closeDeliverModal()">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal para Pegar Guías en Bloque -->
-  <div id="pasteModal" class="modal">
-    <div class="modal-content" tabindex="-1">
-      <div class="modal-header">📥 Pegar Bloque de Guías (Inventario)</div>
-      <p style="font-size:0.8rem; color:#64748b; margin-bottom:8px;">Pega aquí tu lista de guías (separadas por comas, espacios o saltos de línea):</p>
-      <div class="form-group">
-        <textarea id="pasteTrackingsText" rows="6" placeholder="JMX101853945903, JMX601086349658..."></textarea>
-      </div>
-      <div class="modal-actions">
-        <button type="button" onclick="processPastedTrackings()">Procesar y Agregar</button>
-        <button type="button" class="btn-cancel" onclick="closePasteModal()">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal para Ver Foto -->
-  <div id="viewPhotoModal" class="modal">
-    <div class="modal-content" tabindex="-1" style="text-align: center;">
-      <div class="modal-header">📷 Evidencia de Entrega / Resguardo</div>
-      <p style="font-size:0.75rem; color:#64748b; margin-bottom:5px;">💡 Haz clic o toca la imagen para verla en pantalla completa / hacer zoom</p>
-      <img id="modalPreviewImage" class="preview-img" src="" alt="Evidencia" onclick="openLightbox(this.src)">
-      <div class="modal-actions" style="margin-top: 15px;">
-        <button type="button" class="btn-cancel" onclick="closeViewPhotoModal()">Cerrar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Lightbox -->
-  <div id="lightboxModal" class="lightbox-modal" onclick="closeLightbox()">
-    <img id="lightboxImage" src="" alt="Zoom Evidencia">
-  </div>
-
-  <!-- Banner de Instalación PWA -->
-  <div id="installBanner">
-    <p>📲 Instala esta app en tu teléfono</p>
-    <button type="button" id="installBtn">Instalar</button>
-    <button type="button" class="btn-close-install" onclick="document.getElementById('installBanner').classList.remove('show')">✕</button>
-  </div>
+  <!-- NAVEGACIÓN INFERIOR MÓVIL -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="cambiarTab('ruta', this)">
+      <span style="font-size:18px;">🧭</span>
+      <span>En Ruta</span>
+    </button>
+    <button class="nav-item" onclick="cambiarTab('bovedas', this)">
+      <span style="font-size:18px;">🏦</span>
+      <span>Crédito / Cajas</span>
+    </button>
+    <button class="nav-item" onclick="cambiarTab('tarifas', this)">
+      <span style="font-size:18px;">⚙️</span>
+      <span>Tarifas / Nube</span>
+    </button>
+  </nav>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyBnRRdSKC6v4LV0b9rTmyI1c9P-_A-sP-o",
-      authDomain: "resguardo-paquetes.firebaseapp.com",
-      databaseURL: "https://resguardo-paquetes-default-rtdb.firebaseio.com",
-      projectId: "resguardo-paquetes",
-      storageBucket: "resguardo-paquetes.appspot.com",
-      messagingSenderId: "794612391176",
-      appId: "1:794612391176:web:b98c637f1e6b3eb7213426",
-      measurementId: "G-FET9HKB7PW"
+    const STORAGE_KEY = 'corolla_hev_flotilla_v6';
+    let state = {
+      odometer: 45200.0,
+      lastFullOdo: 45200.0,
+      config: {
+        gasPrice: 24.00,
+        kml: 20.0,
+        maintPerKm: 0.90,
+        commPct: 45,
+        firebaseUrl: ''
+      },
+      loans: {
+        loan1Monthly: 7783.09,
+        loan1TotalMonths: 6,
+        loan1PaidMonths: 0,
+        loan2Monthly: 5297.95,
+        loan2TotalMonths: 60,
+        loan2PaidMonths: 0
+      },
+      vaults: {
+        gas: 0,
+        maint: 0,
+        comm: 0,
+        credit: 0
+      },
+      routes: [
+        { name: 'Villa Juárez ↔ Ley del Valle', km: 22, price: 300 },
+        { name: 'Villa Juárez ↔ Central Culiacán', km: 25, price: 340 },
+        { name: 'Villa Juárez ↔ Centro Culiacán', km: 27, price: 360 },
+        { name: 'Villa Juárez ↔ Aeropuerto Culiacán', km: 24, price: 330 }
+      ],
+      history: [],
+      pendingSync: false
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    let packages = [];
-    let scannedPhysicalTrackings = new Set();
-    let searchTimeout = null;
-    let codeReader = null;
-    let scannerTarget = null;
-    let activeDeliverPhotoInput = null;
+    let live = {
+      phase: 'IDLE',
+      kmAB: 0,
+      kmBC: 0,
+      kmCA: 0,
+      kmCurrentLeg: 0,
+      secondsTotal: 0,
+      waitSeconds: 0,
+      speedKmh: 0,
+      fareBase: 0,
+      odoStart: 0,
+      odoPickup: 0,
+      odoDrop: 0,
+      simMode: false,
+      lastGps: null
+    };
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
-          .then(reg => console.log('SW registrado:', reg.scope))
-          .catch(err => console.warn('SW error:', err));
-      });
-    }
-
-    let deferredPrompt = null;
-    const installBanner = document.getElementById('installBanner');
-    const installBtn = document.getElementById('installBtn');
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      if (!sessionStorage.getItem('installBannerDismissed')) {
-        installBanner.classList.add('show');
-      }
-    });
-
-    installBtn.addEventListener('click', async () => {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      console.log('Instalación:', outcome);
-      deferredPrompt = null;
-      installBanner.classList.remove('show');
-    });
-
-    window.addEventListener('appinstalled', () => {
-      console.log('App instalada');
-      installBanner.classList.remove('show');
-      sessionStorage.setItem('installBannerDismissed', '1');
-    });
-
-    document.addEventListener('DOMContentLoaded', () => {
-      setCurrentDate();
-      setDefaultReportDates();
-      listenToFirebase();
-
-      const savedInventory = localStorage.getItem('scannedPhysicalTrackings');
-      if (savedInventory) {
+    function cargarEstado() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
         try {
-          const arr = JSON.parse(savedInventory);
-          arr.forEach(t => scannedPhysicalTrackings.add(t));
-          renderScannedChips();
-        } catch(e) {}
-      }
-
-      const deliverModal = document.getElementById('deliverModal');
-      deliverModal.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          confirmDeliveryWithPhoto();
-        }
-      });
-
-      document.addEventListener('click', (e) => {
-        if (!e.target.closest('.form-group')) {
-          const pSugg = document.getElementById('phoneSuggestions');
-          const nSugg = document.getElementById('nameSuggestions');
-          if(pSugg) pSugg.style.display = 'none';
-          if(nSugg) nSugg.style.display = 'none';
-        }
-      });
-    });
-
-    function handleDeliverPhotoChange(input) {
-      const statusEl = document.getElementById('deliverPhotoStatus');
-      if (input.files && input.files[0]) {
-        activeDeliverPhotoInput = input;
-        const otherInput = input.id === 'deliverCameraInput'
-          ? document.getElementById('deliverGalleryInput')
-          : document.getElementById('deliverCameraInput');
-        otherInput.value = '';
-        statusEl.textContent = `✅ Lista: ${input.files[0].name}`;
-        statusEl.style.display = 'block';
-      } else {
-        activeDeliverPhotoInput = null;
-        statusEl.textContent = '';
-        statusEl.style.display = 'none';
-      }
-    }
-
-    async function openBarcodeScanner(target) {
-      scannerTarget = target;
-      const modal = document.getElementById('scannerModal');
-      const statusEl = document.getElementById('scannerStatus');
-      modal.style.display = 'flex';
-      statusEl.textContent = 'Iniciando cámara...';
-
-      if (typeof ZXing === 'undefined') {
-        statusEl.textContent = 'No se cargó el lector de códigos. Verifica tu conexión o escribe la guía manualmente.';
-        return;
-      }
-
-      try {
-        if (!codeReader) {
-          codeReader = new ZXing.BrowserMultiFormatReader();
-        } else {
-          codeReader.reset();
-        }
-
-        await codeReader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } } },
-          'scannerVideo',
-          (result, err) => {
-            if (result && result.getText()) {
-              const rawCode = result.getText().trim().toUpperCase();
-              const match = rawCode.match(/JMX\d{12}/);
-              const detectedTracking = match ? match[0] : rawCode;
-
-              applyScannedTracking(detectedTracking);
-              closeBarcodeScanner();
-            }
-          }
-        );
-        statusEl.textContent = 'Cámara activa — apunta al código de la guía';
-      } catch (error) {
-        statusEl.textContent = 'No se pudo acceder a la cámara. Revisa los permisos de cámara en el navegador.';
-      }
-    }
-
-    function applyScannedTracking(tracking) {
-      if (scannerTarget === 'search') {
-        const searchInput = document.getElementById('searchInput');
-        searchInput.value = tracking;
-        executeSearch();
-      } else if (scannerTarget === 'register') {
-        const ta = document.getElementById('trackingNum');
-        const current = ta.value.trim();
-        ta.value = current ? `${current}\n${tracking}` : tracking;
-        updateTrackingPreview();
-      } else if (scannerTarget === 'inventory') {
-        const invInput = document.getElementById('inventoryScanInput');
-        invInput.value = tracking;
-        addPhysicalItem();
-      }
-    }
-
-    function closeBarcodeScanner() {
-      if (codeReader) {
-        try {
-          codeReader.reset();
-        } catch (e) {}
-      }
-      document.getElementById('scannerModal').style.display = 'none';
-      scannerTarget = null;
-    }
-
-    function saveInventoryToLocalStorage() {
-      localStorage.setItem('scannedPhysicalTrackings', JSON.stringify(Array.from(scannedPhysicalTrackings)));
-    }
-
-    function listenToFirebase() {
-      db.ref('packages').on('value', (snapshot) => {
-        const data = snapshot.val();
-        packages = [];
-        if (data) {
-          Object.keys(data).forEach(key => {
-            packages.push({ firebaseKey: key, ...data[key] });
-          });
-        }
-        renderTables();
-        executeSearch();
-        generateClientReport();
-        
-        if (document.getElementById('auditResults').style.display === 'block') {
-          processInventoryAudit();
-        }
-      });
-    }
-
-    function validateTrackingFormat(tracking) {
-      const clean = tracking.trim().toUpperCase();
-      const regex = /^JMX\d{12}$/;
-      return { isValid: regex.test(clean), cleaned: clean };
-    }
-
-    function searchPackages() {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => {
-        executeSearch();
-      }, 200);
-    }
-
-    function executeSearch() {
-      const query = document.getElementById('searchInput').value.trim().toLowerCase();
-      const resultsContainer = document.getElementById('searchResults');
-      const riskBanner = document.getElementById('riskBanner');
-
-      if (!query) { 
-        resultsContainer.style.display = 'none'; 
-        riskBanner.style.display = 'none';
-        return; 
-      }
-
-      const filtered = packages.filter(p => 
-        (p.person && p.person.toLowerCase().includes(query)) ||
-        (p.phone && p.phone.toLowerCase().includes(query)) ||
-        (p.altPhone && p.altPhone.toLowerCase().includes(query)) ||
-        (p.tracking && p.tracking.toLowerCase().includes(query))
-      );
-
-      filtered.sort((a, b) => {
-        const aIsDelivered = a.status === 'Entregado' ? 1 : 0;
-        const bIsDelivered = b.status === 'Entregado' ? 1 : 0;
-        if (aIsDelivered !== bIsDelivered) {
-          return aIsDelivered - bIsDelivered; 
-        }
-        return new Date(b.entryDate || b.id) - new Date(a.entryDate || a.id);
-      });
-
-      resultsContainer.style.display = 'block';
-
-      const totalAnomalies = filtered.filter(p => p.status === 'Anomalía' || p.anomalyDate).length;
-      const totalPending = filtered.filter(p => p.status === 'Resguardado').length;
-      const totalSigned = filtered.filter(p => p.status === 'Entregado').length;
-
-      document.getElementById('statAnomalies').textContent = totalAnomalies;
-      document.getElementById('statPending').textContent = totalPending;
-      document.getElementById('statSigned').textContent = totalSigned;
-
-      if (filtered.length > 0) {
-        riskBanner.style.display = 'block';
-        if (totalAnomalies >= 3) {
-          riskBanner.className = 'risk-banner risk-high';
-          riskBanner.innerHTML = `🚨 <strong>CLIENTE CRÍTICO EN ANOMALÍAS (${totalAnomalies} fallos)</strong><br>DENEGAR NUEVO SERVICIO / DEVOLVER PAQUETE A REMITENTE SI NO RECIBE DÍA 1.`;
-        } else if (totalPending >= 4) {
-          riskBanner.className = 'risk-banner risk-medium';
-          riskBanner.innerHTML = `⚠️ <strong>EXCESO DE RESGUARDOS ACUMULADOS (${totalPending} días)</strong><br>Cliente abusa de la opción de resguardo. Notificar que no se aceptarán más resguardos.`;
-        } else {
-          riskBanner.className = 'risk-banner risk-low';
-          riskBanner.innerHTML = `🟢 <strong>CLIENTE DENTRO DE LÍMITES PERMITIDOS</strong><br>Cuenta con historial aceptable de entregas.`;
-        }
-      } else {
-        riskBanner.style.display = 'none';
-      }
-
-      const body = document.getElementById('searchResultsBody');
-      body.innerHTML = '';
-      if(filtered.length === 0) {
-        body.innerHTML = `<tr><td colspan="3" class="empty-message">No se encontraron coincidencias.</td></tr>`;
-      } else {
-        const limitedFiltered = filtered.slice(0, 50);
-        limitedFiltered.forEach(pkg => {
-          let badgeClass = pkg.status === 'Entregado' ? 'badge-entregado' : (pkg.status === 'Anomalía' ? 'badge-anomalia' : 'badge-resguardo');
-          
-          let actionBtn = '';
-          let photoBtnHtml = '';
-
-          if (pkg.status !== 'Entregado') {
-            actionBtn = `<button class="btn-action" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}')">Entregar</button>`;
-            if (pkg.evidencePhoto) {
-              photoBtnHtml = `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button>`;
-            }
-          } else {
-            actionBtn = `<span style="color:#16a34a; font-weight:bold; font-size:0.75rem;">✅ Entregado</span>`;
-            if (pkg.evidencePhoto) {
-              photoBtnHtml = `<br><button class="btn-photo" onclick="event.stopPropagation(); showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button> <button class="btn-upload-photo" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}', true)">✏️ Cambiar Foto</button>`;
-            } else {
-              photoBtnHtml = `<br><button class="btn-upload-photo" onclick="event.stopPropagation(); markAsDelivered('${pkg.firebaseKey}', true)">📷 Subir Foto</button>`;
-            }
-          }
-
-          let datesHtml = `<small style="color:#475569;"><strong>Ingreso:</strong> ${formatDate(pkg.entryDate)}</small>`;
-          if (pkg.status === 'Entregado') {
-            datesHtml += `<br><small style="color:#16a34a; font-weight:bold;"><strong>Entregado:</strong> ${formatDate(pkg.signedDate)}</small>`;
-          } else {
-            datesHtml += `<br><small style="color:#b45309;"><strong>Resguardo:</strong> ${calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite)}</small>`;
-          }
-
-          body.innerHTML += `
-            <tr class="search-row-clickable" onclick="scrollToPackage('${pkg.firebaseKey}')">
-              <td><strong>${pkg.person}</strong><br><small style="color:#64748b">${pkg.tracking}</small>${photoBtnHtml}</td>
-              <td>${datesHtml}</td>
-              <td style="white-space: nowrap;">
-                <span class="badge ${badgeClass}" style="margin-bottom: 4px;">${pkg.status}</span><br>
-                <button class="btn-edit" onclick="event.stopPropagation(); openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
-                ${actionBtn}
-                <button class="btn-delete" onclick="event.stopPropagation(); deleteRecord('${pkg.firebaseKey}')">🗑️ Borrar</button>
-              </td>
-            </tr>
-          `;
-        });
-      }
-    }
-
-    function getParsedTrackings() {
-      const rawText = document.getElementById('trackingNum').value;
-      if (!rawText) return [];
-      return rawText
-        .split(/[\n,]+/)
-        .map(t => t.trim())
-        .filter(t => t.length > 0);
-    }
-
-    function updateTrackingPreview() {
-      const trackings = getParsedTrackings();
-      const previewDiv = document.getElementById('trackingPreview');
-      const submitBtn = document.getElementById('saveSubmitBtn');
-
-      if (trackings.length <= 1) {
-        previewDiv.innerHTML = '';
-        submitBtn.textContent = "Guardar Registro";
-      } else {
-        let chipsHtml = `<span style="font-size:0.75rem; color:#475569; display:block; margin-bottom:2px;">Guías a registrar de forma independiente (${trackings.length}):</span>`;
-        trackings.forEach(t => {
-          chipsHtml += `<span class="tracking-chip">📦 ${t}</span>`;
-        });
-        previewDiv.innerHTML = chipsHtml;
-        submitBtn.textContent = `Guardar ${trackings.length} Registros Independientes`;
-      }
-    }
-
-    function addPhysicalItem() {
-      const input = document.getElementById('inventoryScanInput');
-      const rawVal = input.value.trim();
-      if (!rawVal) return;
-
-      const validation = validateTrackingFormat(rawVal);
-      if (!validation.isValid) {
-        alert(`⚠️ Guía inválida ("${rawVal}").\nDebe iniciar estrictamente con "JMX" seguido exactamente de 12 números (Ej: JMX101853945903). Faltan números o caracteres.`);
-        input.value = '';
-        return;
-      }
-
-      const val = validation.cleaned;
-      if (scannedPhysicalTrackings.has(val)) {
-        alert(`⚠️ Esta guía (${val}) ya la agregaste a la revisión física.`);
-        input.value = '';
-        return;
-      }
-
-      scannedPhysicalTrackings.add(val);
-      saveInventoryToLocalStorage();
-      input.value = '';
-      renderScannedChips();
-    }
-
-    function removePhysicalItem(tracking) {
-      scannedPhysicalTrackings.delete(tracking);
-      saveInventoryToLocalStorage();
-      renderScannedChips();
-    }
-
-    function renderScannedChips() {
-      const container = document.getElementById('scannedChipsContainer');
-      if (scannedPhysicalTrackings.size === 0) {
-        container.innerHTML = `<small style="color:#94a3b8;" id="emptyInventoryHint">Ninguna guía agregada a la revisión física aún.</small>`;
-        return;
-      }
-      container.innerHTML = '';
-      scannedPhysicalTrackings.forEach(track => {
-        const chip = document.createElement('span');
-        chip.className = 'inventory-chip';
-        chip.innerHTML = `${track} <span class="remove-chip" onclick="removePhysicalItem('${track}')">✕</span>`;
-        container.appendChild(chip);
-      });
-    }
-
-    function clearInventoryAudit() {
-      if (confirm('¿Deseas limpiar todas las guías escaneadas del control de inventario?')) {
-        scannedPhysicalTrackings.clear();
-        localStorage.removeItem('scannedPhysicalTrackings');
-        renderScannedChips();
-        document.getElementById('auditResults').style.display = 'none';
-      }
-    }
-
-    function copyInventoryBackup() {
-      if (scannedPhysicalTrackings.size === 0) {
-        alert('No hay guías escaneadas para copiar.');
-        return;
-      }
-      const textToCopy = Array.from(scannedPhysicalTrackings).join('\n');
-      navigator.clipboard.writeText(textToCopy).then(() => {
-        alert('¡Todas las guías escaneadas fueron copiadas al portapapeles con éxito!');
-      }).catch(err => {
-        alert('Error al copiar al portapapeles.');
-      });
-    }
-
-    function openPasteModal() {
-      document.getElementById('pasteTrackingsText').value = '';
-      document.getElementById('pasteModal').style.display = 'flex';
-      setTimeout(() => {
-        document.querySelector('#pasteModal .modal-content').focus();
-      }, 50);
-    }
-
-    function closePasteModal() {
-      document.getElementById('pasteModal').style.display = 'none';
-    }
-
-    function processPastedTrackings() {
-      const rawText = document.getElementById('pasteTrackingsText').value;
-      if (!rawText) {
-        closePasteModal();
-        return;
-      }
-
-      const items = rawText.split(/[\n,;\s]+/).map(t => t.trim()).filter(t => t.length > 0);
-      let addedCount = 0;
-      let invalidCount = 0;
-      let duplicateCount = 0;
-
-      items.forEach(item => {
-        const val = item.toUpperCase();
-        const validation = validateTrackingFormat(val);
-        if (!validation.isValid) {
-          invalidCount++;
-          return;
-        }
-        if (scannedPhysicalTrackings.has(validation.cleaned)) {
-          duplicateCount++;
-          return;
-        }
-        scannedPhysicalTrackings.add(validation.cleaned);
-        addedCount++;
-      });
-
-      saveInventoryToLocalStorage();
-      renderScannedChips();
-      closePasteModal();
-      alert(`Resultados de importación:\n✅ Agregadas: ${addedCount}\n⚠️ Duplicadas omitidas: ${duplicateCount}\n❌ Inválidas (no inician con JMX o faltan números): ${invalidCount}`);
-    }
-
-    function processInventoryAudit() {
-      const resultsContainer = document.getElementById('auditResults');
-      const countMatchedEl = document.getElementById('countMatched');
-      const missingContainer = document.getElementById('missingAuditContainer');
-      const missingTbody = document.getElementById('missingAuditTableBody');
-      const missingCountBadge = document.getElementById('missingCountBadge');
-      const unregisteredContainer = document.getElementById('unregisteredAuditContainer');
-      const unregisteredTbody = document.getElementById('unregisteredAuditTableBody');
-
-      missingTbody.innerHTML = '';
-      unregisteredTbody.innerHTML = '';
-
-      const activeResguardoInSystem = packages.filter(p => p.status === 'Resguardado');
-      const systemTrackingsSet = new Set(activeResguardoInSystem.map(p => (p.tracking || '').toUpperCase()));
-      const allRegisteredTrackingsSet = new Set(packages.map(p => (p.tracking || '').toUpperCase()));
-
-      let matchedCount = 0;
-      let unregisteredTrackings = [];
-
-      scannedPhysicalTrackings.forEach(scannedTrack => {
-        if (systemTrackingsSet.has(scannedTrack)) {
-          matchedCount++;
-        } else if (!allRegisteredTrackingsSet.has(scannedTrack)) {
-          unregisteredTrackings.push(scannedTrack);
-        }
-      });
-
-      const missingPhysical = activeResguardoInSystem.filter(p => {
-        const track = (p.tracking || '').toUpperCase();
-        return !scannedPhysicalTrackings.has(track);
-      });
-
-      resultsContainer.style.display = 'block';
-      countMatchedEl.textContent = `${matchedCount} paquete(s)`;
-      missingCountBadge.textContent = missingPhysical.length;
-
-      if (unregisteredTrackings.length > 0) {
-        unregisteredContainer.style.display = 'block';
-        unregisteredTrackings.forEach(track => {
-          unregisteredTbody.innerHTML += `
-            <tr>
-              <td><strong>${track}</strong></td>
-              <td><span class="badge badge-anomalia">No registrado</span></td>
-              <td>
-                <button class="btn-edit" onclick="prefillRegisterForm('${track}')">➕ Registrar en Sistema</button>
-              </td>
-            </tr>
-          `;
-        });
-      } else {
-        unregisteredContainer.style.display = 'none';
-      }
-
-      if (missingPhysical.length > 0) {
-        missingContainer.style.display = 'block';
-        missingPhysical.forEach(pkg => {
-          missingTbody.innerHTML += `
-            <tr>
-              <td><strong>${pkg.tracking}</strong></td>
-              <td>${pkg.person}</td>
-              <td><small>${formatDate(pkg.entryDate)}</small></td>
-              <td>
-                <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">✅ Entregado</button>
-              </td>
-            </tr>
-          `;
-        });
-      } else {
-        missingContainer.style.display = 'none';
-      }
-    }
-
-    function prefillRegisterForm(tracking) {
-      document.getElementById('trackingNum').value = tracking;
-      updateTrackingPreview();
-      document.getElementById('trackingNum').focus();
-      document.getElementById('packageForm').scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function setCurrentDate() {
-      const now = new Date();
-      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-      document.getElementById('entryDate').value = now.toISOString().slice(0, 16);
-    }
-
-    function setDefaultReportDates() {
-      const today = new Date();
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      document.getElementById('reportStartDate').value = firstDay.toISOString().slice(0, 10);
-      document.getElementById('reportEndDate').value = today.toISOString().slice(0, 10);
-    }
-
-    function toggleAnomalyMode() {
-      const status = document.getElementById('status').value;
-      const isAnomaly = status === 'Anomalía';
-      document.getElementById('anomalyGroup').style.display = isAnomaly ? 'block' : 'none';
-      document.getElementById('trackingNum').required = !isAnomaly;
-      document.getElementById('indefiniteResguardoGroup').style.display = status === 'Resguardado' ? 'block' : 'none';
-    }
-
-    function checkCustomReason() {
-      const sel = document.getElementById('anomalyReasonSelect').value;
-      const customInput = document.getElementById('anomalyNote');
-      if (sel === 'OTRO') {
-        customInput.style.display = 'block';
-        customInput.required = true;
-      } else {
-        customInput.style.display = 'none';
-        customInput.required = false;
-      }
-    }
-
-    function handleAutoComplete(type) {
-      const uniqueClients = [];
-      const map = new Map();
-
-      packages.forEach(p => {
-        if (p.phone && p.person && !map.has(p.phone)) {
-          map.set(p.phone, p.person);
-          uniqueClients.push({ phone: p.phone, person: p.person, altPhone: p.altPhone || '' });
-        }
-      });
-
-      if (type === 'phone') {
-        const query = document.getElementById('phone').value.trim().toLowerCase();
-        const list = document.getElementById('phoneSuggestions');
-        list.innerHTML = '';
-        if (!query) { list.style.display = 'none'; return; }
-
-        const matches = uniqueClients.filter(c => c.phone.toLowerCase().includes(query));
-        if (matches.length > 0) {
-          list.style.display = 'block';
-          matches.forEach(m => {
-            const item = document.createElement('div');
-            item.className = 'autocomplete-item';
-            item.innerHTML = `<strong>${m.phone}</strong> - ${m.person}`;
-            item.onclick = () => selectClient(m);
-            list.appendChild(item);
-          });
-        } else {
-          list.style.display = 'none';
-        }
-      } else if (type === 'name') {
-        const query = document.getElementById('personName').value.trim().toLowerCase();
-        const list = document.getElementById('nameSuggestions');
-        list.innerHTML = '';
-        if (!query) { list.style.display = 'none'; return; }
-
-        const matches = uniqueClients.filter(c => c.person.toLowerCase().includes(query));
-        if (matches.length > 0) {
-          list.style.display = 'block';
-          matches.forEach(m => {
-            const item = document.createElement('div');
-            item.className = 'autocomplete-item';
-            item.innerHTML = `<strong>${m.person}</strong> - ${m.phone}`;
-            item.onclick = () => selectClient(m);
-            list.appendChild(item);
-          });
-        } else {
-          list.style.display = 'none';
-        }
-      }
-    }
-
-    function selectClient(client) {
-      document.getElementById('phone').value = client.phone;
-      document.getElementById('personName').value = client.person;
-      if (client.altPhone) document.getElementById('altPhone').value = client.altPhone;
-      
-      const pSugg = document.getElementById('phoneSuggestions');
-      const nSugg = document.getElementById('nameSuggestions');
-      if(pSugg) pSugg.style.display = 'none';
-      if(nSugg) nSugg.style.display = 'none';
-
-      const hasIndefiniteHistory = packages.some(p => 
-        (p.phone === client.phone || (client.person && p.person && p.person.toLowerCase() === client.person.toLowerCase())) && p.isIndefinite === true
-      );
-
-      document.getElementById('isIndefinite').checked = hasIndefiniteHistory;
-    }
-
-    function getStorageDaysCount(entryDateStr, isIndefinite) {
-      if (isIndefinite) return -1;
-      if (!entryDateStr) return 0;
-      const entryDate = new Date(entryDateStr);
-      const now = new Date();
-      const entryMidnight = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
-      const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const diffTime = nowMidnight - entryMidnight;
-      return Math.round(diffTime / (1000 * 60 * 60 * 24));
-    }
-
-    function calculateDaysInStorage(entryDateStr, isIndefinite) {
-      const diffDays = getStorageDaysCount(entryDateStr, isIndefinite);
-      if (diffDays === -1) return '♾️ Indefinido';
-      if (diffDays <= 0) return 'Hoy';
-      if (diffDays === 1) return '1 día';
-      return `${diffDays} días`;
-    }
-
-    function compressAndConvertImage(fileInput) {
-      return new Promise((resolve) => {
-        const file = fileInput && fileInput.files ? fileInput.files[0] : null;
-        if (!file) { resolve(null); return; }
-
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (e) => {
-          const img = new Image();
-          img.src = e.target.result;
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const maxWidth = 800;
-            const scaleSize = maxWidth / img.width;
-            canvas.width = (img.width > maxWidth) ? maxWidth : img.width;
-            canvas.height = (img.width > maxWidth) ? (img.height * scaleSize) : img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.6));
+          const parsed = JSON.parse(saved);
+          state = {
+            ...state,
+            ...parsed,
+            config: { ...state.config, ...(parsed.config || {}) },
+            loans: { ...state.loans, ...(parsed.loans || {}) },
+            vaults: { ...state.vaults, ...(parsed.vaults || {}) }
           };
-        };
-      });
-    }
-
-    document.getElementById('packageForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const entryDate = document.getElementById('entryDate').value;
-      const status = document.getElementById('status').value;
-      const trackings = getParsedTrackings();
-
-      if (status !== 'Anomalía') {
-        if (trackings.length === 0) {
-          alert('Debes ingresar al menos un número de guía.');
-          return;
-        }
-        for (let t of trackings) {
-          const validation = validateTrackingFormat(t);
-          if (!validation.isValid) {
-            alert(`⚠️ La guía "${t}" no es válida.\nDebe iniciar estrictamente con "JMX" seguido de exactamente 12 números (Ej: JMX101853945903). Faltan números o caracteres.`);
-            return;
-          }
-        }
+        } catch (e) { console.error(e); }
       }
-
-      const cleanTrackings = trackings.map(t => validateTrackingFormat(t).cleaned);
-
-      const existingTrackings = [];
-      cleanTrackings.forEach(t => {
-        if (t && packages.some(p => p.tracking && p.tracking.toUpperCase() === t)) {
-          existingTrackings.push(t);
-        }
-      });
-
-      if (existingTrackings.length > 0) {
-        alert(`⚠️ Las siguientes guías ya están registradas en el sistema:\n${existingTrackings.join(', ')}`);
-        return;
-      }
-
-      const photoBase64 = await compressAndConvertImage(document.getElementById('evidencePhoto'));
-
-      let note = '';
-      if (status === 'Anomalía') {
-        const selReason = document.getElementById('anomalyReasonSelect').value;
-        note = selReason === 'OTRO' ? document.getElementById('anomalyNote').value.trim() : selReason;
-      }
-
-      const person = document.getElementById('personName').value.trim();
-      const phone = document.getElementById('phone').value.trim();
-      const altPhone = document.getElementById('altPhone').value.trim() || '';
-      const description = document.getElementById('description').value.trim() || '---';
-      const isIndefinite = status === 'Resguardado' ? document.getElementById('isIndefinite').checked : false;
-
-      const itemsToRegister = cleanTrackings.length > 0 ? cleanTrackings : [''];
-
-      itemsToRegister.forEach((t, idx) => {
-        const newPackage = {
-          id: Date.now() + idx,
-          tracking: t || 'S/N-' + Date.now().toString().slice(-4),
-          person: person,
-          phone: phone,
-          altPhone: altPhone,
-          description: description,
-          status: status,
-          isIndefinite: isIndefinite,
-          anomalyNote: note,
-          anomalyDate: status === 'Anomalía' ? entryDate : null,
-          entryDate: entryDate,
-          signedDate: status === 'Entregado' ? entryDate : null,
-          evidencePhoto: photoBase64 || null
-        };
-        db.ref('packages').push(newPackage);
-      });
-
-      document.getElementById('trackingNum').value = '';
-      document.getElementById('personName').value = '';
-      document.getElementById('phone').value = '';
-      document.getElementById('altPhone').value = '';
-      document.getElementById('description').value = '';
-      document.getElementById('anomalyNote').value = '';
-      document.getElementById('evidencePhoto').value = '';
-      document.getElementById('isIndefinite').checked = false;
-      document.getElementById('status').value = 'Resguardado';
-      updateTrackingPreview();
-      toggleAnomalyMode();
-      setCurrentDate();
-      alert('¡Registro(s) guardado(s) exitosamente!');
-    });
-
-    function importDataToFirebase(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const importedPackages = JSON.parse(e.target.result);
-          if (Array.isArray(importedPackages)) {
-            importedPackages.forEach(pkg => {
-              db.ref('packages').push(pkg);
-            });
-            alert('¡Todos tus datos han sido cargados a la Nube con éxito!');
-          }
-        } catch (err) {
-          alert('Error al leer el archivo de respaldo.');
-        }
-      };
-      reader.readAsText(file);
+      actualizarUI();
     }
 
-    function openEditModal(key) {
-      const pkg = packages.find(p => p.firebaseKey === key);
-      if (!pkg) return;
-
-      document.getElementById('editKey').value = key;
-      document.getElementById('editTracking').value = pkg.tracking || '';
-      document.getElementById('editPerson').value = pkg.person || '';
-      document.getElementById('editPhone').value = pkg.phone || '';
-      document.getElementById('editAltPhone').value = pkg.altPhone || '';
-      document.getElementById('editDescription').value = pkg.description !== '---' ? pkg.description : '';
-      document.getElementById('editIsIndefinite').checked = pkg.isIndefinite || false;
-      document.getElementById('editEntryDate').value = pkg.entryDate || '';
-
-      document.getElementById('editModal').style.display = 'flex';
-      setTimeout(() => {
-        document.querySelector('#editModal .modal-content').focus();
-      }, 50);
-    }
-
-    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
-
-    function savePackageEdit() {
-      const key = document.getElementById('editKey').value;
-      if (!key) return;
-
-      const trackingVal = document.getElementById('editTracking').value.trim();
-      const validation = validateTrackingFormat(trackingVal);
-      if (!validation.isValid && !trackingVal.startsWith('S/N-')) {
-        alert('⚠️ La guía editada debe iniciar con JMX seguido de 12 números.');
-        return;
-      }
-
-      const updatedData = {
-        tracking: validation.isValid ? validation.cleaned : trackingVal,
-        person: document.getElementById('editPerson').value.trim(),
-        phone: document.getElementById('editPhone').value.trim(),
-        altPhone: document.getElementById('editAltPhone').value.trim(),
-        description: document.getElementById('editDescription').value.trim() || '---',
-        isIndefinite: document.getElementById('editIsIndefinite').checked,
-        entryDate: document.getElementById('editEntryDate').value
-      };
-
-      db.ref('packages/' + key).update(updatedData, (error) => {
-        if (!error) closeEditModal();
-        else alert('Error al actualizar los datos');
-      });
-    }
-
-    function markAsDelivered(key, isDeliveredUpdate = false) {
-      document.getElementById('deliverKey').value = key;
-      document.getElementById('deliverCameraInput').value = '';
-      document.getElementById('deliverGalleryInput').value = '';
-      activeDeliverPhotoInput = null;
-      const statusEl = document.getElementById('deliverPhotoStatus');
-      statusEl.textContent = '';
-      statusEl.style.display = 'none';
-      document.getElementById('deliverModalTitle').textContent = isDeliveredUpdate ? "📷 Adjuntar / Actualizar Foto de Evidencia" : "📦 Entregar Paquete";
-      document.getElementById('deliverModal').style.display = 'flex';
-      
-      setTimeout(() => {
-        document.querySelector('#deliverModal .modal-content').focus();
-      }, 50);
-    }
-
-    function closeDeliverModal() { document.getElementById('deliverModal').style.display = 'none'; }
-
-    async function confirmDeliveryWithPhoto() {
-      const key = document.getElementById('deliverKey').value;
-      if (!key) return;
-
-      const selectedInput = activeDeliverPhotoInput
-        || (document.getElementById('deliverCameraInput').files.length ? document.getElementById('deliverCameraInput') : null)
-        || (document.getElementById('deliverGalleryInput').files.length ? document.getElementById('deliverGalleryInput') : null);
-
-      const photoBase64 = await compressAndConvertImage(selectedInput);
-      const pkg = packages.find(p => p.firebaseKey === key);
-
-      const updatePayload = {};
-
-      if (pkg && pkg.status !== 'Entregado') {
-        const now = new Date();
-        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-        updatePayload.status = 'Entregado';
-        updatePayload.signedDate = now.toISOString().slice(0, 16);
-      }
-
-      if (photoBase64) {
-        updatePayload.evidencePhoto = photoBase64;
-      }
-
-      db.ref('packages/' + key).update(updatePayload, (err) => {
-        if (!err) {
-          closeDeliverModal();
-          if (document.getElementById('auditResults').style.display === 'block') {
-            processInventoryAudit();
-          }
-        } else {
-          alert('Error al actualizar entrega.');
-        }
-      });
-    }
-
-    function showPhotoModal(photoBase64) {
-      document.getElementById('modalPreviewImage').src = photoBase64;
-      document.getElementById('viewPhotoModal').style.display = 'flex';
-      setTimeout(() => {
-        document.querySelector('#viewPhotoModal .modal-content').focus();
-      }, 50);
-    }
-
-    function closeViewPhotoModal() { document.getElementById('viewPhotoModal').style.display = 'none'; }
-
-    function openLightbox(imgSrc) {
-      document.getElementById('lightboxImage').src = imgSrc;
-      document.getElementById('lightboxModal').style.display = 'flex';
-    }
-
-    function closeLightbox() {
-      document.getElementById('lightboxModal').style.display = 'none';
-    }
-
-    function deleteRecord(key) {
-      if (confirm('⚠️ ¿Deseas eliminar este registro de la base de datos?')) {
-        db.ref('packages/' + key).remove((error) => {
-          if (error) alert('Error al eliminar el registro.');
-        });
+    function guardarEstado(marcarSync = true) {
+      if (marcarSync) state.pendingSync = true;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      actualizarUI();
+      if (marcarSync && navigator.onLine && state.config.firebaseUrl) {
+        sincronizarFirebase(false);
       }
     }
 
-    function formatDate(dateStr) {
-      if (!dateStr) return '---';
-      return new Date(dateStr).toLocaleString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-    }
+    function obtenerMetaMensualActual() {
+      const l = state.loans;
+      const p1Activo = l.loan1PaidMonths < l.loan1TotalMonths;
+      const p2Activo = (l.loan1PaidMonths >= 1 || l.loan2PaidMonths > 0) && (l.loan2PaidMonths < l.loan2TotalMonths);
 
-    function formatPhoneDisplay(pkg) {
-      const clientPkgs = packages.filter(p => 
-        (p.phone && pkg.phone && p.phone === pkg.phone) || 
-        (p.person && pkg.person && p.person.toLowerCase() === pkg.person.toLowerCase())
-      );
+      let meta = 0;
+      let etiqueta = '';
 
-      const phonesSet = new Set();
-      const altPhonesSet = new Set();
-      
-      clientPkgs.forEach(p => {
-        if (p.phone) phonesSet.add(p.phone);
-        if (p.altPhone) altPhonesSet.add(p.altPhone);
-      });
-      if (pkg.phone) phonesSet.add(pkg.phone);
-      if (pkg.altPhone) altPhonesSet.add(pkg.altPhone);
-
-      const primaryPhonesArr = Array.from(phonesSet);
-      const altPhonesArr = Array.from(altPhonesSet);
-
-      const mainPhone = primaryPhonesArr[0] || pkg.phone || '---';
-      const extraPhones = primaryPhonesArr.slice(1);
-      const allAlts = [...altPhonesArr, ...extraPhones].filter(tp => tp !== mainPhone);
-
-      const deliveredCount = packages.filter(p => p.person && pkg.person && p.person.toLowerCase() === pkg.person.toLowerCase() && p.status === 'Entregado').length;
-      const anomalyCount = packages.filter(p => p.person && pkg.person && p.person.toLowerCase() === pkg.person.toLowerCase() && (p.status === 'Anomalía' || p.anomalyDate)).length;
-
-      const resguardoDates = new Set();
-      packages.forEach(p => {
-        if (p.person && pkg.person && p.person.toLowerCase() === pkg.person.toLowerCase() && p.status === 'Resguardado' && p.entryDate) {
-          resguardoDates.add(p.entryDate.slice(0, 10));
-        }
-      });
-      const resguardoCount = resguardoDates.size;
-
-      let html = `<small style="color:#64748b">📱 Tel: ${mainPhone}</small>`;
-      if (allAlts.length > 0) {
-        html += `<br><small style="color:#2563eb; font-weight:bold;">📞 Otro(s): ${allAlts.join(', ')}</small>`;
-      }
-      html += `<span class="client-stats">✅ ${deliveredCount} ent. | 📦 ${resguardoCount} día(s) resg. | 🚨 ${anomalyCount} anom.</span>`;
-      return html;
-    }
-
-    function renderTables() {
-      renderGeneralTable();
-    }
-
-    function renderGeneralTable() {
-      const tbody = document.getElementById('generalTableBody');
-      tbody.innerHTML = '';
-      
-      const activePackages = packages.filter(p => p.status === 'Resguardado');
-      const totalCount = activePackages.length;
-
-      document.getElementById('activeResguardoCount').textContent = `Total: ${totalCount}`;
-
-      if (totalCount === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="empty-message">No hay paquetes activos en resguardo.</td></tr>`;
-        return;
-      }
-
-      activePackages.sort((a, b) => new Date(b.entryDate || b.id) - new Date(a.entryDate || a.id));
-
-      activePackages.forEach((pkg, index) => {
-        const pkgNum = totalCount - index;
-        const tr = document.createElement('tr');
-        tr.id = `pkg-row-${pkg.firebaseKey}`;
-        
-        const diffDays = getStorageDaysCount(pkg.entryDate, pkg.isIndefinite);
-        
-        let rowClass = '';
-        let colorKey = '';
-
-        if (!pkg.isIndefinite) {
-          if (diffDays >= 10) { rowClass = 'status-red'; colorKey = 'red'; }
-          else if (diffDays >= 7) { rowClass = 'status-orange'; colorKey = 'orange'; }
-          else if (diffDays >= 2) { rowClass = 'status-yellow'; colorKey = 'yellow'; }
-          else if (diffDays === 1) { rowClass = 'status-green'; colorKey = 'green'; }
-        }
-
-        if (rowClass) tr.classList.add(rowClass);
-
-        const daysText = calculateDaysInStorage(pkg.entryDate, pkg.isIndefinite);
-        const daysDisplay = colorKey ? `<span class="day-badge ${colorKey}">${daysText}</span>` : daysText;
-
-        let badgeIndefinite = pkg.isIndefinite ? `<span class="badge-indefinido">♾️ Indefinido</span>` : '';
-
-        tr.innerHTML = `
-          <td><span class="pkg-number">#${pkgNum}</span></td>
-          <td><strong>${pkg.person}</strong><br>${formatPhoneDisplay(pkg)}</td>
-          <td><small>${pkg.tracking}</small></td>
-          <td>${pkg.description || '---'}</td>
-          <td><span class="badge badge-resguardo">${pkg.status}</span>${badgeIndefinite}</td>
-          <td>${formatDate(pkg.entryDate)}</td>
-          <td>${daysDisplay}</td>
-          <td style="white-space: nowrap;">
-            <button class="btn-edit" onclick="openEditModal('${pkg.firebaseKey}')">✏️ Editar</button>
-            <button class="btn-action" onclick="markAsDelivered('${pkg.firebaseKey}')">Entregar</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function scrollToPackage(key) {
-      const targetRow = document.getElementById(`pkg-row-${key}`);
-      if (targetRow) {
-        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        targetRow.classList.remove('highlight-row');
-        void targetRow.offsetWidth;
-        targetRow.classList.add('highlight-row');
+      if (p1Activo && !p2Activo) {
+        meta = l.loan1Monthly;
+        etiqueta = 'Meta Diciembre (Solo Préstamo 1)';
+      } else if (p1Activo && p2Activo) {
+        meta = l.loan1Monthly + l.loan2Monthly;
+        etiqueta = `Meta Mes (Préstamo 1 + Préstamo 2)`;
+      } else if (!p1Activo && p2Activo) {
+        meta = l.loan2Monthly;
+        etiqueta = 'Meta Mensual (Solo Préstamo 2)';
       } else {
-        alert('Este paquete fue entregado o se encuentra registrado en el historial de reportes.');
+        meta = 0;
+        etiqueta = '¡Créditos Liquidados al 100%!';
       }
+
+      return { meta, etiqueta, p1Activo, p2Activo };
     }
 
-    function generateClientReport() {
-      const clientName = document.getElementById('reportClientInput').value.trim().toLowerCase();
-      const startDateStr = document.getElementById('reportStartDate').value;
-      const endDateStr = document.getElementById('reportEndDate').value;
-      const tbody = document.getElementById('reportTableBody');
-      const summaryDiv = document.getElementById('reportSummary');
-
-      if (!clientName) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">Escribe el nombre de un cliente arriba para ver sus entregas.</td></tr>`;
-        summaryDiv.textContent = '';
+    function pagarMensualidadActual() {
+      const { meta, p1Activo, p2Activo } = obtenerMetaMensualActual();
+      if (meta <= 0) {
+        alert('¡Felicidades! Ya liquidaste ambos préstamos.');
+        return;
+      }
+      if (!confirm(`¿Registrar el pago de la mensualidad actual por $${meta.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN? Se descontará de tu Bóveda Crédito.`)) {
         return;
       }
 
-      const startDate = startDateStr ? new Date(startDateStr + 'T00:00:00') : new Date('2000-01-01');
-      const endDate = endDateStr ? new Date(endDateStr + 'T23:59:59') : new Date('2099-12-31');
+      state.vaults.credit -= meta;
+      if (p1Activo) state.loans.loan1PaidMonths++;
+      if (p2Activo) state.loans.loan2PaidMonths++;
 
-      const clientDeliveredPackages = packages.filter(p => {
-        const matchesClient = p.person.toLowerCase().includes(clientName);
-        const matchesStatus = p.status === 'Entregado';
-        const signDate = p.signedDate ? new Date(p.signedDate) : new Date(p.entryDate);
-        const matchesDate = signDate >= startDate && signDate <= endDate;
-        return matchesClient && matchesStatus && matchesDate;
+      state.history.unshift({
+        date: new Date().toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }),
+        type: `🏦 Pago Mensualidad Crédito ($${meta.toFixed(2)})`,
+        km: '0',
+        odoRange: state.odometer.toFixed(1),
+        charged: '0.00',
+        gas: '0.00',
+        maint: '0.00',
+        comm: '0.00',
+        credit: (-meta).toFixed(2)
       });
 
-      summaryDiv.textContent = `📊 Paquetes Entregados / Firmados a "${document.getElementById('reportClientInput').value}": ${clientDeliveredPackages.length} paquete(s) en este período.`;
+      guardarEstado();
+    }
 
-      tbody.innerHTML = '';
-      if (clientDeliveredPackages.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-message">No hay paquetes entregados a este cliente en el rango de fechas seleccionado.</td></tr>`;
+    function cambiarTab(tab, el) {
+      document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+      document.getElementById('sec-' + tab).classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function calibrarOdometro() {
+      const val = prompt('Ingresa el kilometraje actual exacto de tu tablero Corolla:', state.odometer.toFixed(1));
+      if (val !== null && !isNaN(parseFloat(val))) {
+        state.odometer = parseFloat(val);
+        guardarEstado();
+      }
+    }
+
+    // CORRECCIÓN MANUAL DE KILÓMETROS DEL TRAMO ACTUAL (ANTI-FALLO GPS)
+    function editarKmTramoActual() {
+      if (live.phase === 'IDLE' || live.phase === 'POST_DROP' || live.phase === 'WAITING') {
+        alert('Inicia un tramo en movimiento para ajustar su distancia.');
+        return;
+      }
+      const nuevoVal = prompt(
+        `El GPS/app registra ${live.kmCurrentLeg.toFixed(2)} km en este tramo.\nIngresa los kilómetros reales según el tablero de tu Corolla:`,
+        live.kmCurrentLeg.toFixed(1)
+      );
+      if (nuevoVal === null) return;
+      const parsed = parseFloat(nuevoVal);
+      if (isNaN(parsed) || parsed < 0) {
+        alert('Ingresa un número válido de kilómetros.');
         return;
       }
 
-      clientDeliveredPackages.forEach(pkg => {
-        let photoBtnHtml = pkg.evidencePhoto 
-          ? `<button class="btn-photo" onclick="showPhotoModal('${pkg.evidencePhoto}')">📷 Ver Foto</button> <button class="btn-upload-photo" onclick="markAsDelivered('${pkg.firebaseKey}', true)">✏️ Cambiar Foto</button>` 
-          : `<button class="btn-upload-photo" onclick="markAsDelivered('${pkg.firebaseKey}', true)">📷 Subir Foto</button>`;
+      const diferencia = parsed - live.kmCurrentLeg;
+      live.kmCurrentLeg = parsed;
+      state.odometer = Math.max(0, state.odometer + diferencia);
 
-        tbody.innerHTML += `
-          <tr>
-            <td><small>${pkg.tracking}</small></td>
-            <td><strong>${pkg.person}</strong></td>
-            <td>${formatDate(pkg.entryDate)}</td>
-            <td><span style="color:#16a34a; font-weight:bold;">${formatDate(pkg.signedDate)}</span></td>
-            <td>${photoBtnHtml}</td>
-          </tr>
-        `;
-      });
+      if (live.phase === 'PICKUP') {
+        live.kmAB = Math.max(0, live.kmAB + diferencia);
+      } else if (live.phase === 'TRIP' || live.phase === 'RETURN_CLIENT') {
+        live.kmBC = Math.max(0, live.kmBC + diferencia);
+      } else if (live.phase === 'RETURNING' || live.phase === 'PERSONAL') {
+        live.kmCA = Math.max(0, live.kmCA + diferencia);
+      }
+
+      document.getElementById('odo-val').textContent = state.odometer.toLocaleString('es-MX', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      actualizarTelemetriaUI();
+      actualizarPreviewComision();
+      guardarEstado(false);
     }
-  </script>
-</body>
-</html>
+
+    setInterval(() => {
+      if (live.phase !== 'IDLE') {
+        live.secondsTotal++;
+        if (live.phase === 'WAITING') {
+          live.waitSeconds++;
+          const waitFee = (live.waitSeconds / 60) * 2.50;
+          document.getElementById('wait-fee-live').textContent = '$' + waitFee.toFixed(2) + ' MXN';
+        }
+        if (live.simMode && live.speedKmh > 0) {
+          const deltaKm = live.speedKmh / 3600;
+          avanzarDistancia(deltaKm);
+        }
+        actualizarTelemetriaUI();
+      }
+    }, 1000);
+
+    function avanzarDistancia(deltaKm) {
+      if (deltaKm <= 0) return;
+      state.odometer += deltaKm;
+      live.kmCurrentLeg += deltaKm;
+      if (live.phase === 'PICKUP') live.kmAB += deltaKm;
+      if (live.phase === 'TRIP' || live.phase === 'RETURN_CLIENT') live.kmBC += deltaKm;
+      if (live.phase === 'RETURNING' || live.phase === 'PERSONAL') live.kmCA += deltaKm;
+      document.getElementById('odo-val').textContent = state.odometer.toLocaleString('es-MX', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      actualizarPreviewComision();
+    }
+
+    if ('geolocation' in navigator) {
+      navigator.geolocation.watchPosition((pos) => {
+        if (live.simMode) return;
+        const { latitude, longitude, speed } = pos.coords;
+        if (speed !== null && !isNaN(speed)) {
+          live.speedKmh = Math.round(speed * 3.6);
+        }
+        if (live.phase !== 'IDLE' && live.lastGps) {
+          const d = haversine(live.lastGps.lat, live.lastGps.lon, latitude, longitude);
+          if (d > 0.005 && d < 2) {
+            avanzarDistancia(d);
+          }
+        }
+        live.lastGps = { lat: latitude, lon: longitude };
+      }, () => {}, { enableHighAccuracy: true, maximumAge: 2000 });
+    }
+
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function toggleSimulador() {
+      const p = document.getElementById('sim-panel');
+      p.classList.toggle('hidden');
+      live.simMode = !p.classList.contains('hidden');
+      if (!live.simMode) {
+        live.speedKmh = 0;
+        document.getElementById('sim-speed').value = 0;
+        document.getElementById('sim-speed-label').textContent = '0 km/h';
+      }
+    }
+
+    function actualizarVelocidadSim(val) {
+      live.speedKmh = parseFloat(val);
+      document.getElementById('sim-speed-label').textContent = val + ' km/h';
+    }
+
+    async function conectarOBD2() {
+      if (!navigator.bluetooth) {
+        alert('Tu navegador no soporta Web Bluetooth. Usa Google Chrome en Android con un escáner OBD2 BLE.');
+        return;
+      }
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb', '0000ffe0-0000-1000-8000-00805f9b34fb']
+        });
+        document.getElementById('btn-ble').classList.add('active-ble');
+        document.getElementById('btn-ble').textContent = '🔵 ' + (device.name || 'OBD2');
+        alert('Conectado a ' + (device.name || 'Escáner OBD2') + '. Listo para telemetría.');
+      } catch (err) {
+        console.log('OBD2 cancelado:', err);
+      }
+    }
+
+    function setPhase(newPhase, badgeText) {
+      live.phase = newPhase;
+      live.kmCurrentLeg = 0;
+      document.getElementById('phase-badge').textContent = badgeText;
+      ['controls-idle', 'controls-pickup', 'controls-trip', 'controls-post-drop', 'controls-waiting', 'controls-return-client', 'controls-returning', 'controls-personal']
+        .forEach(id => document.getElementById(id).classList.add('hidden'));
+
+      const map = {
+        IDLE: 'controls-idle',
+        PICKUP: 'controls-pickup',
+        TRIP: 'controls-trip',
+        POST_DROP: 'controls-post-drop',
+        WAITING: 'controls-waiting',
+        RETURN_CLIENT: 'controls-return-client',
+        RETURNING: 'controls-returning',
+        PERSONAL: 'controls-personal'
+      };
+      document.getElementById(map[newPhase]).classList.remove('hidden');
+      document.getElementById('cycle-summary').classList.toggle('hidden', newPhase === 'IDLE' || newPhase === 'PERSONAL');
+
+      const editablePhases = ['PICKUP', 'TRIP', 'RETURN_CLIENT', 'RETURNING', 'PERSONAL'];
+      document.getElementById('btn-edit-leg-km').classList.toggle('hidden', !editablePhases.includes(newPhase));
+
+      actualizarTelemetriaUI();
+    }
+
+    function iniciarAcercamiento() {
+      live.kmAB = 0; live.kmBC = 0; live.kmCA = 0;
+      live.secondsTotal = 0; live.waitSeconds = 0;
+      live.odoStart = state.odometer;
+      setPhase('PICKUP', 'YENDO POR CLIENTE (A → B)');
+    }
+
+    // NUEVO: TRASLADO OPERATIVO SIN COBRO ($0)
+    function iniciarTrasladoOperativo() {
+      live.kmAB = 0; live.kmBC = 0; live.kmCA = 0;
+      live.secondsTotal = 0; live.waitSeconds = 0;
+      live.odoStart = state.odometer;
+      setPhase('RETURNING', 'TRASLADO OPERATIVO VACÍO ($0)');
+    }
+
+    function cerrarComoTrasladoVacio() {
+      cerrarServicioCompleto(0, '🚚 Traslado Vacío Operativo ($0)');
+    }
+
+    function recogerCliente() {
+      live.odoPickup = state.odometer;
+      document.getElementById('trip-fare-input').value = '';
+      setPhase('TRIP', 'CON CLIENTE EN RUTA (B → C)');
+      actualizarPreviewComision();
+    }
+
+    function aplicarTarifaRapida(idx) {
+      if (idx === '') return;
+      const r = state.routes[parseInt(idx)];
+      if (r) {
+        document.getElementById('trip-fare-input').value = r.price;
+        actualizarPreviewComision();
+      }
+    }
+
+    document.getElementById('trip-fare-input').addEventListener('input', actualizarPreviewComision);
+
+    function actualizarPreviewComision() {
+      const fare = parseFloat(document.getElementById('trip-fare-input').value) || 0;
+      const gasCostPerKm = state.config.gasPrice / state.config.kml;
+      const totalCostPerKm = gasCostPerKm + state.config.maintPerKm;
+      const estReturnKm = fare > 0 ? (live.kmAB + live.kmBC) : 0;
+      const totalEstKm = live.kmAB + live.kmBC + estReturnKm;
+      const autoCost = totalEstKm * totalCostPerKm;
+      const netFree = Math.max(0, fare - autoCost);
+      const comm = netFree * (state.config.commPct / 100);
+      const credit = netFree - comm;
+
+      document.getElementById('live-commission-preview').innerHTML = `
+        <strong>Vista previa (${totalEstKm.toFixed(1)} km):</strong><br>
+        • Costo Auto ($${totalCostPerKm.toFixed(2)}/km): <strong>$${autoCost.toFixed(2)}</strong><br>
+        • Tu Comisión (${state.config.commPct}%): <strong style="color:#34d399;">$${comm.toFixed(2)}</strong> | Crédito: <strong style="color:#a78bfa;">$${credit.toFixed(2)}</strong>
+      `;
+    }
+
+    function llegarDestino() {
+      const rawVal = document.getElementById('trip-fare-input').value.trim();
+      const fare = rawVal === '' ? 0 : parseFloat(rawVal);
+      if (isNaN(fare) || fare < 0) {
+        alert('Ingresa un monto válido (0 o mayor).');
+        return;
+      }
+      live.fareBase = fare;
+      live.odoDrop = state.odometer;
+      if (fare === 0) {
+        cerrarServicioCompleto(0, '🚚 Traslado Vacío Operativo ($0)');
+        return;
+      }
+      setPhase('POST_DROP', 'CLIENTE EN DESTINO (ELIGE ACCIÓN)');
+    }
+
+    function iniciarEsperaRedondo() {
+      live.waitSeconds = 0;
+      setPhase('WAITING', 'ESPERANDO CLIENTE ($2.50/MIN)');
+    }
+
+    function iniciarRegresoCliente() {
+      setPhase('RETURN_CLIENT', 'REGRESO CON CLIENTE (50% TARIFA)');
+    }
+
+    function finalizarViajeRedondo() {
+      const waitFee = (live.waitSeconds / 60) * 2.50;
+      const returnFare = live.fareBase * 0.50;
+      const totalCharged = live.fareBase + waitFee + returnFare;
+      cerrarServicioCompleto(totalCharged, 'Viaje Redondo + Espera');
+    }
+
+    function iniciarRetornoBase() {
+      setPhase('RETURNING', 'REGRESANDO VACÍO A BASE');
+    }
+
+    function quedarEnZona() {
+      cerrarServicioCompleto(live.fareBase, 'Servicio (En Zona / Sin retorno vacío)');
+    }
+
+    function interceptarNuevoServicio() {
+      cerrarServicioCompleto(live.fareBase, 'Servicio / Traslado previo');
+      iniciarAcercamiento();
+    }
+
+    function llegarABase() {
+      const label = live.fareBase > 0 ? 'Servicio Completo Ida/Vuelta' : '🚚 Traslado Vacío a Base ($0)';
+      cerrarServicioCompleto(live.fareBase, label);
+    }
+
+    function cerrarServicioCompleto(totalCobrado, tipoEtiqueta) {
+      const totalKm = live.kmAB + live.kmBC + live.kmCA;
+      const gasCost = totalKm * (state.config.gasPrice / state.config.kml);
+      const maintCost = totalKm * state.config.maintPerKm;
+      const netFree = Math.max(0, totalCobrado - gasCost - maintCost);
+      const comm = netFree * (state.config.commPct / 100);
+      const credit = netFree - comm;
+
+      state.vaults.gas += gasCost;
+      state.vaults.maint += maintCost;
+      state.vaults.comm += comm;
+      state.vaults.credit += credit;
+
+      state.history.unshift({
+        date: new Date().toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }),
+        type: tipoEtiqueta,
+        km: totalKm.toFixed(2),
+        odoRange: `${live.odoStart.toFixed(1)} → ${state.odometer.toFixed(1)}`,
+        charged: totalCobrado.toFixed(2),
+        gas: gasCost.toFixed(2),
+        maint: maintCost.toFixed(2),
+        comm: comm.toFixed(2),
+        credit: credit.toFixed(2)
+      });
+
+      live.fareBase = 0;
+      setPhase('IDLE', 'EN BASE (LISTO)');
+      guardarEstado();
+    }
+
+    function cancelarCiclo() {
+      if (confirm('¿Cancelar el servicio actual sin guardar?')) {
+        live.fareBase = 0;
+        setPhase('IDLE', 'EN BASE (LISTO)');
+      }
+    }
+
+    function iniciarVueltaPersonal() {
+      live.kmAB = 0; live.kmBC = 0; live.kmCA = 0;
+      live.secondsTotal = 0;
+      live.odoStart = state.odometer;
+      setPhase('PERSONAL', 'USO PERSONAL EN CURSO');
+    }
+
+    function finalizarVueltaPersonal() {
+      const kmPers = live.kmCA;
+      const gasCost = kmPers * (state.config.gasPrice / state.config.kml);
+      const maintCost = kmPers * state.config.maintPerKm;
+      const totalDiscount = gasCost + maintCost;
+
+      state.vaults.comm -= totalDiscount;
+      state.vaults.gas += gasCost;
+      state.vaults.maint += maintCost;
+
+      state.history.unshift({
+        date: new Date().toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }),
+        type: '🟣 Vuelta Personal (Descuento Comisión)',
+        km: kmPers.toFixed(2),
+        odoRange: `${live.odoStart.toFixed(1)} → ${state.odometer.toFixed(1)}`,
+        charged: '0.00',
+        gas: gasCost.toFixed(2),
+        maint: maintCost.toFixed(2),
+        comm: (-totalDiscount).toFixed(2),
+        credit: '0.00'
+      });
+
+      setPhase('IDLE', 'EN BASE (LISTO)');
+      guardarEstado();
+    }
+
+    function previsualizarGasolina() {
+      const pesos = parseFloat(document.getElementById('fuel-pesos').value);
+      const liters = parseFloat(document.getElementById('fuel-liters').value);
+      const odo = parseFloat(document.getElementById('fuel-odo').value) || state.odometer;
+      const isFull = document.getElementById('fuel-full').checked;
+
+      if (pesos > 0 && liters > 0) {
+        const pricePerLiter = pesos / liters;
+        let msg = `Precio calculado: <strong>$${pricePerLiter.toFixed(2)} MXN/L</strong>.`;
+        if (isFull && odo > state.lastFullOdo) {
+          const dist = odo - state.lastFullOdo;
+          const realKml = dist / liters;
+          msg += ` | Rendimiento real: <strong style="color:#34d399;">${realKml.toFixed(2)} km/L</strong> (${dist.toFixed(1)} km recorridos).`;
+        }
+        document.getElementById('fuel-calc-preview').innerHTML = msg;
+      }
+    }
+
+    function registrarGasolina() {
+      const pesos = parseFloat(document.getElementById('fuel-pesos').value);
+      const liters = parseFloat(document.getElementById('fuel-liters').value);
+      const odo = parseFloat(document.getElementById('fuel-odo').value) || state.odometer;
+      const isFull = document.getElementById('fuel-full').checked;
+
+      if (!pesos || !liters) {
+        alert('Ingresa los pesos pagados y los litros cargados.');
+        return;
+      }
+
+      const newPricePerLiter = pesos / liters;
+      state.config.gasPrice = parseFloat(newPricePerLiter.toFixed(2));
+
+      let note = `⛽ Carga Gasolina (${liters}L @ $${newPricePerLiter.toFixed(2)}/L)`;
+      if (isFull) {
+        if (odo > state.lastFullOdo) {
+          const dist = odo - state.lastFullOdo;
+          const realKml = dist / liters;
+          if (realKml > 8 && realKml < 40) {
+            state.config.kml = parseFloat(realKml.toFixed(2));
+            note += ` • Calibrado a ${state.config.kml} km/L`;
+          }
+        }
+        state.lastFullOdo = odo;
+      }
+
+      state.vaults.gas -= pesos;
+      state.history.unshift({
+        date: new Date().toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }),
+        type: note,
+        km: '0',
+        odoRange: odo.toFixed(1),
+        charged: '0.00',
+        gas: (-pesos).toFixed(2),
+        maint: '0.00',
+        comm: '0.00',
+        credit: '0.00'
+      });
+
+      document.getElementById('fuel-pesos').value = '';
+      document.getElementById('fuel-liters').value = '';
+      guardarEstado();
+      alert('Carga registrada. Precio del litro y rendimiento actualizados en toda la app.');
+    }
+
+    function registrarMantenimiento() {
+      const desc = document.getElementById('maint-desc').value.trim() || 'Mantenimiento / Taller';
+      const cost = parseFloat(document.getElementById('maint-cost').value);
+      if (!cost || cost <= 0) {
+        alert('Ingresa el monto del gasto.');
+        return;
+      }
+      state.vaults.maint -= cost;
+      state.history.unshift({
+        date: new Date().toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }),
+        type: '🔧 ' + desc,
+        km: '0',
+        odoRange: state.odometer.toFixed(1),
+        charged: '0.00',
+        gas: '0.00',
+        maint: (-cost).toFixed(2),
+        comm: '0.00',
+        credit: '0.00'
+      });
+      document.getElementById('maint-desc').value = '';
+      document.getElementById('maint-cost').value = '';
+      guardarEstado();
+    }
+
+    function guardarTarifa() {
+      const name = document.getElementById('route-name').value.trim();
+      const km = parseFloat(document.getElementById('route-km').value);
+      const price = parseFloat(document.getElementById('route-price').value);
+      const idx = parseInt(document.getElementById('edit-route-index').value);
+
+      if (!name || !km || !price) {
+        alert('Completa nombre, distancia y precio de la ruta.');
+        return;
+      }
+
+      if (idx >= 0) {
+        state.routes[idx] = { name, km, price };
+        document.getElementById('edit-route-index').value = '-1';
+        document.getElementById('btn-save-route').textContent = '+ Guardar Tarifa Fija';
+      } else {
+        state.routes.push({ name, km, price });
+      }
+
+      document.getElementById('route-name').value = '';
+      document.getElementById('route-km').value = '';
+      document.getElementById('route-price').value = '';
+      guardarEstado();
+    }
+
+    function editarTarifa(idx) {
+      const r = state.routes[idx];
+      document.getElementById('route-name').value = r.name;
+      document.getElementById('route-km').value = r.km;
+      document.getElementById('route-price').value = r.price;
+      document.getElementById('edit-route-index').value = idx;
+      document.getElementById('btn-save-route').textContent = '💾 Actualizar Tarifa';
+    }
+
+    function eliminarTarifa(idx) {
+      if (confirm('¿Eliminar esta tarifa fija?')) {
+        state.routes.
